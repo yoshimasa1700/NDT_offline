@@ -80,7 +80,6 @@ add_library(${PROJECT_NAME} SHARED
 message(${Boost_LIBRARIES_2})
 
 target_link_libraries(${PROJECT_NAME}
-  python3.8
   ${Boost_LIBRARIES_2}
   ${PYTHON_LIBRARIES}
   Eigen3::Eigen
