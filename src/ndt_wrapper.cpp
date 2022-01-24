@@ -60,7 +60,7 @@ public:
     cov = MatrixXd::Identity(3, 3);
   }
 
-  p::list registration(np::ndarray &scan_pc_py){
+  p::list registration(np::ndarray &scan_pc_py, int max_iteration){
     MatrixXd scan_pc = convertNdarrayToEigen(scan_pc_py);
 
     // convert eigen pc to pcl pc.
@@ -77,7 +77,7 @@ public:
     TransformT initial_trans = MatrixXd::Zero(6, 1);
 
     // convert matrix to pcl.
-    TransformT relative_pose = Align(initial_trans, scan_pc_pcl.makeShared());
+    TransformT relative_pose = Align(initial_trans, scan_pc_pcl.makeShared(), max_iteration);
 
     return convertEigenToList(relative_pose);
   }

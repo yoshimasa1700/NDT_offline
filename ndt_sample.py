@@ -17,8 +17,14 @@ mu = 0
 sigma = 1.0
 
 # create reference point cloud
-sample_count = 1
+sample_count = 50
 reference_pc = np.random.normal(mu, sigma, (sample_count, 3)).astype(np.float32)
+
+# reference_pc = np.array([
+#     [-2/3,-2/3,0],
+#     [1/3,-2/3,0],
+#     [1/3,4/3,0]
+# ], dtype=np.float32)
 
 # create map
 ndt = libndt.NDT()
@@ -32,13 +38,17 @@ scan_pc = np.apply_along_axis(lambda x: rot.apply(x) + trans, 1, reference_pc).a
 
 # print(scan_pc)
 
-scan_pc = np.array([[ 0.9, 8, 5]], dtype=np.float32)
-reference_pc = np.array([[ 1, 8, 5]], dtype=np.float32)
+# scan_pc = np.array([[ 0.9, 8, 5],
+#                     [ 0.8, 8, 5],
+#                     [ 0.7, 8, 5],
+#                     [ 0.6, 8, 5]
+# ], dtype=np.float32)
+# reference_pc = np.array([[ 1, 8, 5]], dtype=np.float32)
 
 print(scan_pc)
 
 # registration and get result transform.
-transform = ndt.registration(scan_pc)
+transform = ndt.registration(scan_pc, 2)
 
 print(transform)
 
