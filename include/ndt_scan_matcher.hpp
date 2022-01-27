@@ -437,13 +437,13 @@ tuple<double, JacobianT, HessianT> computeDerivative
  const PointT &x_k_dash, const CovarianceMatrixT &cov_inv){
 
   PointTT xkd_T_conv_inv =  x_k_dash.transpose() * cov_inv;
-  double xkd_T_conv_inv_xkd = xkd_T_conv_inv * x_k_dash;
+  double xkd_T_conv_inv_xkd = x_k_dash.dot(xkd_T_conv_inv);
   double exp_term = exp(-param.d(2) / 2 * xkd_T_conv_inv_xkd);
   double d1_d2 = param.d(1) * param.d(2);
 
   // calc jacobian.
   JacobianT jacobian = xkd_T_conv_inv * point_jacobian;
-  jacobian *= d1_d2 * exp_term;
+  jacobian *= (d1_d2 * exp_term);
 
   // calc hessian.
   HessianT hessian;
@@ -473,27 +473,27 @@ tuple<double, JacobianT, HessianT> computeDerivative
 
 void angleDerivatives(TransformT & tf,JacobianCoefficientsT & jacobian_coefficients,HessianCoefficientsT & hessian_coefficients){
   double cx, cy, cz, sx, sy, sz;
-  if (fabs(tf(3)) < 10e-5) {
-    cx = 1.0;
-    sx = 0.0;
-  } else {
+  // if (fabs(tf(3)) < 10e-5) {
+  //   cx = 1.0;
+  //   sx = 0.0;
+  // } else {
     cx = cos(tf(3));
     sx = sin(tf(3));
-  }
-  if (fabs(tf(4)) < 10e-5) {
-    cy = 1.0;
-    sy = 0.0;
-  } else {
+  // }
+  // if (fabs(tf(4)) < 10e-5) {
+  //   cy = 1.0;
+  //   sy = 0.0;
+  // } else {
     cy = cos(tf(4));
     sy = sin(tf(4));
-  }
-  if (fabs(tf(5)) < 10e-5) {
-    cz = 1.0;
-    sz = 0.0;
-  } else {
+  // }
+  // if (fabs(tf(5)) < 10e-5) {
+  //   cz = 1.0;
+  //   sz = 0.0;
+  // } else {
     cz = cos(tf(5));
     sz = sin(tf(5));
-  }
+    // }
   jacobian_coefficients <<    (-sx * sz + cx * sy * cz),  (-sx * cz - cx * sy * sz),  (-cx * cy),
     (cx * sz + sx * sy * cz),   (cx * cz - sx * sy * sz),   (-sx * cy),
     (-sy * cz),                 sy * sz,                    cy,
@@ -523,7 +523,11 @@ void angleDerivatives(TransformT & tf,JacobianCoefficientsT & jacobian_coefficie
     (-sx * sz + cx * sy * cz),  (-cx * sy * sz - sx * cz),  0;
 }
 
-void pointDerivatives(PointT & point,JacobianCoefficientsT & jacobian_coefficients,HessianCoefficientsT & hessian_coefficients,PointJacobianT & point_jacobian,PointHessianT & point_hessian){
+void pointDerivatives(PointT & point,
+                      JacobianCoefficientsT & jacobian_coefficients,
+                      HessianCoefficientsT & hessian_coefficients,
+                      PointJacobianT & point_jacobian,
+                      PointHessianT & point_hessian){
   double jacobian_params[8]={0,0,0,0,0,0,0,0};
   vector<Vector3d,aligned_allocator<Vector3d> > hessian_params(6);
   for(int i=0;i<8;i++){
@@ -531,6 +535,7 @@ void pointDerivatives(PointT & point,JacobianCoefficientsT & jacobian_coefficien
       jacobian_params[i] += point(j) * jacobian_coefficients(i,j);
     }
   }
+
   for(int i=0;i<6;i++){
     hessian_params[i] << 0,0,0;
     for(int j=0;j<3;j++){
@@ -539,8 +544,10 @@ void pointDerivatives(PointT & point,JacobianCoefficientsT & jacobian_coefficien
       hessian_params[i](2) += point(j) * hessian_coefficients(i*3+2,j);
     }
   }
+
   point_jacobian = MatrixXd::Zero(3, 6);
   point_hessian = MatrixXd::Zero(18, 6);
+
   point_jacobian(0,0) = 1;
   point_jacobian(1,1) = 1;
   point_jacobian(2,2) = 1;
@@ -582,16 +589,25 @@ TransformT Align(TransformT init_trans, pcl::PointCloud<pcl::PointXYZ>::Ptr clou
     JacobianT iter_jacobian = JacobianT::Zero();
     HessianT iter_hessian = HessianT::Zero();
 
-    tf_cloud = TransformPointCloud(cloud,tf);
+    // tf_cloud = TransformPointCloud(cloud,tf);
+    tf_cloud = *cloud;
+
+    JacobianCoefficientsT jacobian_coefficients;
+    HessianCoefficientsT hessian_coefficients;
+    angleDerivatives(tf,jacobian_coefficients,hessian_coefficients);
+
+    // cerr << "tf" << endl;
+    // cerr << tf << endl;
 
     //点ループ
     for (unsigned int point_id = 0; point_id < tf_cloud.points.size(); point_id++){
       //点の型変換
       PointT point;
       point << tf_cloud.points[point_id].x,tf_cloud.points[point_id].y,tf_cloud.points[point_id].z;
-      JacobianCoefficientsT jacobian_coefficients;
-      HessianCoefficientsT hessian_coefficients;
-      angleDerivatives(tf,jacobian_coefficients,hessian_coefficients);
+
+      // cerr << "jacobian coeff" << endl;
+      // cerr << jacobian_coefficients << endl;
+
       PointJacobianT point_jacobian;
       PointHessianT point_hessian;
       pointDerivatives(point,jacobian_coefficients,hessian_coefficients,point_jacobian,point_hessian);
@@ -622,12 +638,24 @@ TransformT Align(TransformT init_trans, pcl::PointCloud<pcl::PointXYZ>::Ptr clou
       bool exists;
       double det = 0;
       cov.computeInverseAndDetWithCheck(cov_inv,det,exists);
+
       if(!exists) continue;
       PointT x_k_dash = point - mean;
       //マッチ毎にscore,jacobian,hessianの計算
+
+      // std::cerr << "point_jacobian" << endl;
+      // std::cerr << point_jacobian << endl;
+
+      // std::cerr << "xkdash" << endl;
+      // std::cerr << x_k_dash << endl;
+
       tuple<double, JacobianT, HessianT> iter_derivatives = computeDerivative(gauss_params, point_jacobian, point_hessian, x_k_dash, cov_inv);
       iter_score += get<0>(iter_derivatives);
       iter_jacobian += get<1>(iter_derivatives);
+
+      // cerr << "jacobian" << endl;
+      // cerr << get<1>(iter_derivatives) << endl;
+
 
       jacobian_vector.push_back(get<1>(iter_derivatives));
 
@@ -677,27 +705,30 @@ TransformT Align(TransformT init_trans, pcl::PointCloud<pcl::PointXYZ>::Ptr clou
     cout << "iter_hessian" << endl;
     cout << iter_hessian << endl;
 
+    jacobian_vector_sum.push_back(iter_jacobian);
+
     // if(!hessian_exists) break;
 
     // update = iter_hessian_inv * iter_jacobian;
     update = svd.solve(iter_jacobian);;
     update_norm = update.norm();
 
-    cout << "update" << endl;
-    cout << update << endl;
-    cout << "update.norm()" << endl;
     cout << update.norm() << endl;
+
+    update_vector.push_back(update);
 
     //tfの再計算
     tf += update;
-    // if(iterations > max_iterations || update_norm < transformation_epsilon) converged = true;
-    converged = true;
+    if(iterations > max_iterations || update_norm < transformation_epsilon) converged = true;
+    // converged = true;
     iterations++;
   }
   return tf;
 }
 
   std::vector<JacobianT> jacobian_vector;
+  std::vector<JacobianT> jacobian_vector_sum;
+  std::vector<TransformT> update_vector;
 };
 
 #endif // __NDT_SCAN_MATCHER_HPP__
