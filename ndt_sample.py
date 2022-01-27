@@ -14,17 +14,17 @@ def visualize_pc(ax, pc, label):
     ax.scatter3D(pc[:, 0], pc[:, 1], pc[:, 2], label=label)
 
 mu = 0
-sigma = 1.0
+sigma = 0.1
 
 # create reference point cloud
-sample_count = 50
+sample_count = 5
 reference_pc = np.random.normal(mu, sigma, (sample_count, 3)).astype(np.float32)
 
-# reference_pc = np.array([
-#     [-2/3,-2/3,0],
-#     [1/3,-2/3,0],
-#     [1/3,4/3,0]
-# ], dtype=np.float32)
+reference_pc = np.array([
+    [-2/3,-2/3,0],
+    [1/3,-2/3,0],
+    [1/3,4/3,0]
+], dtype=np.float32)
 
 # create map
 ndt = libndt.NDT()
@@ -33,7 +33,7 @@ ndt.create_map(reference_pc)
 # create scan point cloud
 euler = np.array([ 0.0, 0, 0.0])
 rot = Rotation.from_euler('zyx', euler, degrees=True)
-trans = np.array([ 0.1, 0.0, 0.0])
+trans = np.array([ 1.0, 0.0, 0.0])
 scan_pc = np.apply_along_axis(lambda x: rot.apply(x) + trans, 1, reference_pc).astype(np.float32)
 
 # print(scan_pc)
@@ -48,9 +48,20 @@ scan_pc = np.apply_along_axis(lambda x: rot.apply(x) + trans, 1, reference_pc).a
 print(scan_pc)
 
 # registration and get result transform.
-transform = ndt.registration(scan_pc, 2)
+transform = ndt.registration(scan_pc, 1)
 
 print(transform)
+
+jacobians = ndt.get_jacobian_list()
+jacobians = np.array(jacobians).reshape((-1, 6))
+
+
+print(jacobians)
+
+print(jacobians[:, 0:3])
+
+jacobian_part = jacobians[:, 0:3]
+
 
 euler_ans = np.array(transform[3: 6])
 rot_ans = Rotation.from_euler('zyx', euler, degrees=True)
@@ -64,9 +75,20 @@ ans_pc = np.apply_along_axis(
 fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
 
+
 visualize_pc(ax, reference_pc, "reference")
 visualize_pc(ax, scan_pc, "scan")
 visualize_pc(ax, ans_pc, "registered")
+
+print(scan_pc.shape)
+print(jacobian_part.shape)
+
+ax.quiver(scan_pc[:, 0], scan_pc[:, 1], scan_pc[:, 2],
+          jacobian_part[:, 0],
+          jacobian_part[:, 1],
+          jacobian_part[:, 2]
+
+)
 
 ax.legend()
 

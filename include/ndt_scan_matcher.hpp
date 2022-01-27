@@ -1,6 +1,7 @@
 #ifndef __NDT_SCAN_MATCHER_HPP__
 #define __NDT_SCAN_MATCHER_HPP__
 
+#include <Eigen/src/Core/util/Constants.h>
 #include <iostream>
 // #include <ros/ros.h>
 // PCL specific includes
@@ -563,6 +564,9 @@ void pointDerivatives(PointT & point,JacobianCoefficientsT & jacobian_coefficien
 
 }
 
+class NDTCalc{
+public:
+
 // TransformT Align(TransformT init_trans, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,std::map<int, Leaf> align_leaves,std::map<int, node> align_nodes_map,int align_root_id){
 TransformT Align(TransformT init_trans, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, const unsigned int &max_iterations){
   pcl::PointCloud<pcl::PointXYZ> tf_cloud;
@@ -624,6 +628,9 @@ TransformT Align(TransformT init_trans, pcl::PointCloud<pcl::PointXYZ>::Ptr clou
       tuple<double, JacobianT, HessianT> iter_derivatives = computeDerivative(gauss_params, point_jacobian, point_hessian, x_k_dash, cov_inv);
       iter_score += get<0>(iter_derivatives);
       iter_jacobian += get<1>(iter_derivatives);
+
+      jacobian_vector.push_back(get<1>(iter_derivatives));
+
       iter_hessian += get<2>(iter_derivatives);
       // } // neighbor
     } // points
@@ -683,10 +690,14 @@ TransformT Align(TransformT init_trans, pcl::PointCloud<pcl::PointXYZ>::Ptr clou
 
     //tfの再計算
     tf += update;
-    if(iterations > max_iterations || update_norm < transformation_epsilon) converged = true;
+    // if(iterations > max_iterations || update_norm < transformation_epsilon) converged = true;
+    converged = true;
     iterations++;
   }
   return tf;
 }
+
+  std::vector<JacobianT> jacobian_vector;
+};
 
 #endif // __NDT_SCAN_MATCHER_HPP__

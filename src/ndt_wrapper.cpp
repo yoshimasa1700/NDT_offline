@@ -77,14 +77,27 @@ public:
     TransformT initial_trans = MatrixXd::Zero(6, 1);
 
     // convert matrix to pcl.
-    TransformT relative_pose = Align(initial_trans, scan_pc_pcl.makeShared(), max_iteration);
+    TransformT relative_pose = calc.Align(initial_trans, scan_pc_pcl.makeShared(), max_iteration);
 
     return convertEigenToList(relative_pose);
+  }
+
+  p::list get_jacobian_list(){
+
+    p::list result;
+
+    for(unsigned int i = 0 ; i < calc.jacobian_vector.size(); ++i){
+      result.extend(convertEigenToList(calc.jacobian_vector[i]));
+    }
+
+    return result;
   }
 
 private:
   Matrix<double, 3, 1> mu;
   Matrix<double, 3, 3> cov;
+
+  NDTCalc calc;
 };
 
 
@@ -95,5 +108,6 @@ BOOST_PYTHON_MODULE(libndt)
 
   p::class_<NDT>("NDT")
     .def("create_map", &NDT::create_map)
-    .def("registration", &NDT::registration);
+    .def("registration", &NDT::registration)
+    .def("get_jacobian_list", &NDT::get_jacobian_list);
 }
