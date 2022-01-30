@@ -589,8 +589,8 @@ TransformT Align(TransformT init_trans, pcl::PointCloud<pcl::PointXYZ>::Ptr clou
     JacobianT iter_jacobian = JacobianT::Zero();
     HessianT iter_hessian = HessianT::Zero();
 
-    // tf_cloud = TransformPointCloud(cloud,tf);
-    tf_cloud = *cloud;
+    tf_cloud = TransformPointCloud(cloud,tf);
+    // tf_cloud = *cloud;
 
     JacobianCoefficientsT jacobian_coefficients;
     HessianCoefficientsT hessian_coefficients;
@@ -656,8 +656,8 @@ TransformT Align(TransformT init_trans, pcl::PointCloud<pcl::PointXYZ>::Ptr clou
       // cerr << "jacobian" << endl;
       // cerr << get<1>(iter_derivatives) << endl;
 
-
       jacobian_vector.push_back(get<1>(iter_derivatives));
+      hessian_vector.push_back(get<2>(iter_derivatives));
 
       iter_hessian += get<2>(iter_derivatives);
       // } // neighbor
@@ -700,20 +700,21 @@ TransformT Align(TransformT init_trans, pcl::PointCloud<pcl::PointXYZ>::Ptr clou
     //     }
     // }
 
-    cout << "iter_jacobian" << endl;
-    cout << iter_jacobian << endl;
-    cout << "iter_hessian" << endl;
-    cout << iter_hessian << endl;
+    // cout << "iter_jacobian" << endl;
+    // cout << iter_jacobian << endl;
+    // cout << "iter_hessian" << endl;
+    // cout << iter_hessian << endl;
 
     jacobian_vector_sum.push_back(iter_jacobian);
 
     // if(!hessian_exists) break;
 
     // update = iter_hessian_inv * iter_jacobian;
-    update = svd.solve(iter_jacobian);;
+    update = iter_hessian_inv * iter_jacobian;
+    // update = svd.solve(iter_jacobian);;
     update_norm = update.norm();
 
-    cout << update.norm() << endl;
+    // cout << update.norm() << endl;
 
     update_vector.push_back(update);
 
@@ -729,6 +730,7 @@ TransformT Align(TransformT init_trans, pcl::PointCloud<pcl::PointXYZ>::Ptr clou
   std::vector<JacobianT> jacobian_vector;
   std::vector<JacobianT> jacobian_vector_sum;
   std::vector<TransformT> update_vector;
+  std::vector<HessianT> hessian_vector;
 };
 
 #endif // __NDT_SCAN_MATCHER_HPP__
