@@ -9,7 +9,7 @@
 // #include <pcl/filters/voxel_grid.h>
 // #include <pcl/features/normal_3d.h>
 
-
+#define DEBUG  // for store intermidiate values
 #include "ndt_scan_matcher.hpp"
 
 namespace np = boost::python::numpy;
@@ -23,9 +23,6 @@ MatrixXd convertNdarrayToEigen(const np::ndarray &n){
   int cols = n.shape(0);
   int rows = n.shape(1);
 
-  cerr << "cols:" << cols << endl;
-  cerr << "rows:" << rows << endl;
-
   float *p = reinterpret_cast<float*>(n.get_data());
 
   MatrixXd result = MatrixXd::Zero(cols, rows);
@@ -35,7 +32,6 @@ MatrixXd convertNdarrayToEigen(const np::ndarray &n){
       result(i, j) = *p;
       p++;
     }
-    cerr << endl;
   }
 
   return result;
@@ -71,8 +67,6 @@ public:
     // convert eigen pc to pcl pc.
     pcl::PointCloud<pcl::PointXYZ> scan_pc_pcl;
 
-    std::cerr << scan_pc << std::endl;
-
     for(unsigned int r = 0; r < scan_pc.rows(); ++r){
       pcl::PointXYZ p(scan_pc(r, 0),
                       scan_pc(r, 1),
@@ -99,7 +93,7 @@ public:
     return result;
   }
 
-  p::list get_jacobian_list2(){
+  p::list get_jacobian_sum_list(){
 
     p::list result;
 
@@ -115,6 +109,16 @@ public:
 
     for(unsigned int i = 0 ; i < calc.update_vector.size(); ++i){
       result.extend(convertEigenToList(calc.update_vector[i]));
+    }
+
+    return result;
+  }
+
+  p::list get_hessian_list(){
+    p::list result;
+
+    for(unsigned int i = 0 ; i < calc.hessian_vector.size(); ++i){
+      result.extend(convertEigenToList(calc.hessian_vector[i]));
     }
 
     return result;
@@ -137,6 +141,7 @@ BOOST_PYTHON_MODULE(libndt)
     .def("create_map", &NDT::create_map)
     .def("registration", &NDT::registration)
     .def("get_jacobian_list", &NDT::get_jacobian_list)
-    .def("get_jacobian_list2", &NDT::get_jacobian_list2)
-    .def("get_update_list", &NDT::get_update_list);
+    .def("get_jacobian_sum_list", &NDT::get_jacobian_sum_list)
+    .def("get_update_list", &NDT::get_update_list)
+    .def("get_hessian_list", &NDT::get_hessian_list);
 }

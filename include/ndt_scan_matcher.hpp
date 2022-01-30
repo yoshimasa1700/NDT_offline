@@ -34,7 +34,6 @@ using namespace Eigen;
 using TransformT = Matrix<double, 6, 1>;
 using JacobianT = TransformT;
 using HessianT = Matrix<double, 6, 6>;
-// using HessianT = MatrixXd;
 using JacobianCoefficientsT = Matrix<double, 8, 3>;
 using HessianCoefficientsT = Matrix<double, 18, 3>;
 using PointJacobianT = Matrix<double, 3, 6>;
@@ -44,10 +43,9 @@ using PointT = Matrix<double, 3, 1>;
 using PointTT = Matrix<double, 1, 3>;
 
 TransformT init_trans;//イテレーション終了時とコールバックで更新
-// int max_iterations = 0;
 double transformation_epsilon = 0.01;
 double leaf_size = 2;
-double output_prob = 0.55;
+double output_prob = 0.055;
 
 // ros::Publisher vis_pub,vis_pub2;
 // ros::Publisher pose_pub,cloud_pub;
@@ -590,23 +588,16 @@ TransformT Align(TransformT init_trans, pcl::PointCloud<pcl::PointXYZ>::Ptr clou
     HessianT iter_hessian = HessianT::Zero();
 
     tf_cloud = TransformPointCloud(cloud,tf);
-    // tf_cloud = *cloud;
 
     JacobianCoefficientsT jacobian_coefficients;
     HessianCoefficientsT hessian_coefficients;
     angleDerivatives(tf,jacobian_coefficients,hessian_coefficients);
-
-    // cerr << "tf" << endl;
-    // cerr << tf << endl;
 
     //点ループ
     for (unsigned int point_id = 0; point_id < tf_cloud.points.size(); point_id++){
       //点の型変換
       PointT point;
       point << tf_cloud.points[point_id].x,tf_cloud.points[point_id].y,tf_cloud.points[point_id].z;
-
-      // cerr << "jacobian coeff" << endl;
-      // cerr << jacobian_coefficients << endl;
 
       PointJacobianT point_jacobian;
       PointHessianT point_hessian;
@@ -643,94 +634,46 @@ TransformT Align(TransformT init_trans, pcl::PointCloud<pcl::PointXYZ>::Ptr clou
       PointT x_k_dash = point - mean;
       //マッチ毎にscore,jacobian,hessianの計算
 
-      // std::cerr << "point_jacobian" << endl;
-      // std::cerr << point_jacobian << endl;
-
-      // std::cerr << "xkdash" << endl;
-      // std::cerr << x_k_dash << endl;
-
-      tuple<double, JacobianT, HessianT> iter_derivatives = computeDerivative(gauss_params, point_jacobian, point_hessian, x_k_dash, cov_inv);
+      tuple<double, JacobianT, HessianT> iter_derivatives = computeDerivative
+        (gauss_params, point_jacobian, point_hessian, x_k_dash, cov_inv);
       iter_score += get<0>(iter_derivatives);
       iter_jacobian += get<1>(iter_derivatives);
+      iter_hessian += get<2>(iter_derivatives);
 
-      // cerr << "jacobian" << endl;
-      // cerr << get<1>(iter_derivatives) << endl;
-
+#ifdef DEBUG
       jacobian_vector.push_back(get<1>(iter_derivatives));
       hessian_vector.push_back(get<2>(iter_derivatives));
+#endif // DEBUG
 
-      iter_hessian += get<2>(iter_derivatives);
+
       // } // neighbor
     } // points
 
-    cout << "iter_score" << endl;
-    cout << iter_score << endl;
-
     //ニュートン方第2項(update)の計算
-    int res;
     HessianT iter_hessian_inv = iter_hessian.completeOrthogonalDecomposition().pseudoInverse();;
-
-    // bool hessian_exists = true;
-
-    Eigen::JacobiSVD<Eigen::MatrixXd> svd(iter_hessian,
-                                          Eigen::ComputeFullU
-                                          | Eigen::ComputeFullV);
-
-    // Eigen::VectorXd s = svd.singularValues();
-
-    // cout << "singular values" << endl;
-    // cout << s << endl;
-
-    // s = s.array().inverse();
-
-    // iter_hessian_inv =
-    //   svd.matrixV()
-    //   * s.asDiagonal()
-    //   * svd.matrixU().transpose();
-
-    // cout << "iter_hessian * iter_hessian_inv" << endl;
-    // cout << iter_hessian * iter_hessian_inv << endl;
-
-    // iter_hessian_inv = iter_hessian.inverse();
-    // for(int hessian_id = 0; hessian_id < 36; hessian_id++){
-    //     if(isnan(iter_hessian_inv(hessian_id))) {
-    //         cout << "hessian wasn't invertible!" << endl;
-    //         hessian_exists = false;
-    //         break;
-    //     }
-    // }
-
-    // cout << "iter_jacobian" << endl;
-    // cout << iter_jacobian << endl;
-    // cout << "iter_hessian" << endl;
-    // cout << iter_hessian << endl;
-
-    jacobian_vector_sum.push_back(iter_jacobian);
-
-    // if(!hessian_exists) break;
-
-    // update = iter_hessian_inv * iter_jacobian;
     update = iter_hessian_inv * iter_jacobian;
-    // update = svd.solve(iter_jacobian);;
     update_norm = update.norm();
 
-    // cout << update.norm() << endl;
-
+#ifdef DEBUG
+    jacobian_vector_sum.push_back(iter_jacobian);
     update_vector.push_back(update);
+#endif // DEBUG
 
     //tfの再計算
-    tf += update;
-    if(iterations > max_iterations || update_norm < transformation_epsilon) converged = true;
-    // converged = true;
+    tf -= update;
+    if(iterations >= max_iterations || update_norm < transformation_epsilon)
+      converged = true;
     iterations++;
   }
   return tf;
 }
 
+#ifdef DEBUG
   std::vector<JacobianT> jacobian_vector;
   std::vector<JacobianT> jacobian_vector_sum;
   std::vector<TransformT> update_vector;
   std::vector<HessianT> hessian_vector;
+#endif // DEBUG
 };
 
 #endif // __NDT_SCAN_MATCHER_HPP__
