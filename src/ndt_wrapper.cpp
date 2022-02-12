@@ -115,6 +115,25 @@ public:
 
 #endif // DEBUG
 
+  p::list get_map(){
+    p::list result;
+
+    for(auto itr = calc.leaves.begin(); itr != calc.leaves.end(); ++itr){
+
+      p::list mean;
+      for(int i = 0; i < 3; ++i)
+        mean.append(itr->second.mean[i]);
+
+      p::list cov;
+      for(int i = 0; i < 6; ++i)
+        cov.append(itr->second.params[i]);
+
+      result.append(p::make_tuple(mean ,cov));
+    }
+
+    return result;
+  }
+
 private:
   Matrix<double, 3, 1> mu;
   Matrix<double, 3, 3> cov;
@@ -131,6 +150,7 @@ BOOST_PYTHON_MODULE(libndt)
   p::class_<NDT>("NDT")
     .def("set_leaf_size", &NDT::set_leaf_size)
     .def("create_map", &NDT::create_map)
+    .def("get_map", &NDT::get_map)
 #ifdef DEBUG
     .def("get_jacobian_list", &NDT::get_jacobian_list)
     .def("get_jacobian_sum_list", &NDT::get_jacobian_sum_list)

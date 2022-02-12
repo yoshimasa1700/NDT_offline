@@ -13,12 +13,13 @@ script_dir = osp.dirname(osp.abspath(__file__))
 sys.path.append(osp.join(script_dir, "build"))
 import libndt
 
-leaf_size = 0.05  # for bunny
-# leaf_size = 2.0  # for car
+# leaf_size = 0.05  # for bunny
+leaf_size = 5.0  # for car
 
 
-def visualize_pc(ax, pc, label):
-    ax.scatter3D(pc[:, 0], pc[:, 1], pc[:, 2], label=label, marker='.')
+def visualize_pc(ax, pc, label, marker='.', markersize=1):
+    ax.scatter3D(pc[:, 0], pc[:, 1], pc[:, 2], label=label,
+                 marker=marker, s=markersize)
 
 
 # random sample point
@@ -29,9 +30,10 @@ def create_random_pc():
     return np.random.normal(mu, sigma, (sample_count, 3)).astype(np.float32)
 
 
-def load_pc_from_pcd(path):
+def load_pc_from_pcd(path, voxel_filter=False):
     pcd = o3d.io.read_point_cloud(path)
-    return np.asarray(pcd.points).astype(np.float32)
+    pcd = pcd.voxel_down_sample(voxel_size=2.0)
+    return np.asarray(pcd.points).astype(np.float32), pcd
 
 
 # fixed point
@@ -119,6 +121,11 @@ def visualize_result(ndt, reference_pc, scan_pc, registerd_pc):
     #           update[0, 2],
     #           color="blue")
 
+    map_data = ndt.get_map()
+
+    center_points = np.array([g[0] for g in map_data])
+    visualize_pc(ax, center_points, "grid center", marker='^', markersize=20)
+
     # plot settings.
     ax.legend()
     ax.set_xlabel('X axis')
@@ -133,9 +140,9 @@ def visualize_result(ndt, reference_pc, scan_pc, registerd_pc):
 
     l = 0.2
 
-    ax.set_xlim(-l/2, l/2)
-    ax.set_ylim(0, l)
-    ax.set_zlim(-l, l)
+    # ax.set_xlim(-l/2, l/2)
+    # ax.set_ylim(0, l)
+    # ax.set_zlim(-l, l)
 
     plt.show()
 
@@ -149,14 +156,17 @@ def main():
     ndt.set_leaf_size(leaf_size)
 
     # prepare reference pc
-    sample_data_path = osp.join(script_dir, "data", "bunny.pcd")
-    # sample_data_path = osp.join(script_dir, "data", "downsample_map.pcd")
-    reference_pc = load_pc_from_pcd(sample_data_path)
+    # sample_data_path = osp.join(script_dir, "data", "bunny.pcd")
+    sample_data_path = osp.join(script_dir, "data", "downsample_map.pcd")
+    reference_pc, ref_pcd = load_pc_from_pcd(sample_data_path)
+
+    print(ref_pcd.has_colors())
+    print(len(ref_pcd.points))
 
     # prepare scan pc
-    scan_pc = convert_pc([0.006, 0.006, 0.0, 0., 0., 0.], reference_pc)
-    # sample_data_path = osp.join(script_dir, "data", "scan_sample.pcd")
-    # scan_pc = load_pc_from_pcd(sample_data_path)
+    # scan_pc = convert_pc([0.006, 0.006, 0.0, 0., 0., 0.], reference_pc)
+    sample_data_path = osp.join(script_dir, "data", "scan_sample.pcd")
+    scan_pc, scan_pcd = load_pc_from_pcd(sample_data_path)
 
     # create map
     t = time.time()
@@ -170,6 +180,26 @@ def main():
     print("registration: {}".format(time.time() - t))
 
     registerd_pc = convert_pc(transform, scan_pc)
+
+    euler = np.array(transform[3: 6])
+    rot = Rotation.from_euler('zyx', euler, degrees=True).as_dcm()
+    trans = np.array(transform[0: 3])
+
+    print(trans)
+    print(rot)
+
+    registered_pcd = copy.deepcopy(scan_pcd)
+    # registered_pcd.rotate(rot)
+    # registered_pcd.translate(trans)
+
+    s_color = np.array([[255, 0, 0] for _ in range(len(scan_pcd.points))])
+    scan_pcd.colors = o3d.utility.Vector3dVector(s_color)
+
+    r_color = np.array([[0, 0, 255] for _ in range(len(registered_pcd.points))])
+    registered_pcd.colors = o3d.utility.Vector3dVector(r_color)
+
+    # o3d.visualization.draw_geometries([ref_pcd, scan_pcd, registered_pcd])
+    o3d.visualization.draw_geometries([ref_pcd, registered_pcd])
 
     # visualize result
     visualize_result(ndt, reference_pc, scan_pc, registerd_pc)
