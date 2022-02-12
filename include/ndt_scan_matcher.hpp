@@ -1,16 +1,8 @@
 #ifndef __NDT_SCAN_MATCHER_HPP__
 #define __NDT_SCAN_MATCHER_HPP__
 
-#include <Eigen/src/Core/Matrix.h>
-#include <limits>
-#include <Eigen/src/Core/util/Constants.h>
-#include <Eigen/src/Core/util/Meta.h>
-#include <iostream>
-#include <map>
-#include <math.h>
-#include <Eigen/Dense>
-#include <vector>
 #include <bits/stdc++.h>
+#include <Eigen/Dense>
 
 using namespace std;
 using namespace Eigen;
@@ -43,15 +35,15 @@ typedef struct
 typedef struct
 {
   int	points = 0;
-  // Eigen::Vector3f mean(0, 0, 0);
+  // Vector3f mean(0, 0, 0);
   float mean[3] = {0,0,0};
   float params[6] = {0,0,0,0,0,0};//11,22,33,12,13,23
   float inverse_params[6]={0,0,0,0,0,0};//11,22,33,12,13,23
   float a[9];
   float eigen_vector[9];
-  // Eigen::Matrix3f cov;
-  // Eigen::Matrix3f evecs;
-  // Eigen::Vector3f evals;
+  // Matrix3f cov;
+  // Matrix3f evecs;
+  // Vector3f evals;
 } Leaf;
 
 bool AxisSort(const unsigned int &sort_axis, const point_with_id &n1, const point_with_id &n2)
@@ -167,8 +159,8 @@ int eigenJacobiMethod(float *a, float *v, int n, float eps = 1e-8, int iter_max 
 
 int CreateNode(int* root_id,
                int point_size,
-               std::vector<node>& nodes,
-               std::vector<std::vector<int>> axis_sort_ids,
+               vector<node>& nodes,
+               vector<vector<int>> axis_sort_ids,
                int depth,
                int parent_id,
                bool node_is_right)
@@ -193,43 +185,43 @@ int CreateNode(int* root_id,
 
   // have no child
   if(group_size <= 1){
-    // std::cout<<"leaf"<<std::endl;
+    // cout<<"leaf"<<endl;
     return 1;
   }
 
-  std::vector<int>::iterator middle_iter(axis_sort_ids[axis].begin());
-  std::advance(middle_iter, middle);
+  vector<int>::iterator middle_iter(axis_sort_ids[axis].begin());
+  advance(middle_iter, middle);
 
-  std::vector<int> left_group(axis_sort_ids[axis].begin(), middle_iter);
+  vector<int> left_group(axis_sort_ids[axis].begin(), middle_iter);
   ++middle_iter;
 
-  std::vector<int> right_group(middle_iter, axis_sort_ids[axis].end());
-  // std::cout<<std::endl;
-  // std::cout<<"median_id"<<median_id<<std::endl;
-  // std::cout<<"middle"<<middle<<std::endl;
-  // std::cout<<"axis"<<nodes[median_id].axis<<std::endl;
-  // std::cout<<"group is (";
+  vector<int> right_group(middle_iter, axis_sort_ids[axis].end());
+  // cout<<endl;
+  // cout<<"median_id"<<median_id<<endl;
+  // cout<<"middle"<<middle<<endl;
+  // cout<<"axis"<<nodes[median_id].axis<<endl;
+  // cout<<"group is (";
   // for(int i=0;i<group_size;i++){
-  //   std::cout<<axis_sort_ids[axis][i]<<",";
+  //   cout<<axis_sort_ids[axis][i]<<",";
   // }
-  // std::cout<<")"<<std::endl;
-  // std::cout<<"left_group is (";
+  // cout<<")"<<endl;
+  // cout<<"left_group is (";
   // for(unsigned int i=0;i<left_group.size();i++){
-  //   std::cout<<left_group[i]<<",";
+  //   cout<<left_group[i]<<",";
   // }
-  // std::cout<<")"<<std::endl;
-  // std::cout<<"right_group is (";
+  // cout<<")"<<endl;
+  // cout<<"right_group is (";
   // for(unsigned int i=0;i<right_group.size();i++){
-  //   std::cout<<right_group[i]<<",";
+  //   cout<<right_group[i]<<",";
   // }
-  // std::cout<<")"<<std::endl;
-  // std::cout<<std::endl;
-  std::vector<std::vector<int>> left_axis_sort_ids(3,std::vector<int>(left_group.size()));
-  std::vector<std::vector<int>> right_axis_sort_ids(3,std::vector<int>(right_group.size()));
+  // cout<<")"<<endl;
+  // cout<<endl;
+  vector<vector<int>> left_axis_sort_ids(3,vector<int>(left_group.size()));
+  vector<vector<int>> right_axis_sort_ids(3,vector<int>(right_group.size()));
 
-  std::vector<int> next_group(point_size,0);
-  std::vector<int> left_axis_count(3,0);
-  std::vector<int> right_axis_count(3,0);
+  vector<int> next_group(point_size,0);
+  vector<int> left_axis_count(3,0);
+  vector<int> right_axis_count(3,0);
   for(unsigned int i = 0; i < left_group.size(); i++){
     left_axis_sort_ids[axis][i] = left_group[i];
     next_group[left_group[i]] = -1;
@@ -287,19 +279,19 @@ int CreateNode(int* root_id,
 double EuclidDist3D(const float* a, const float* b){
   float d2 = 0;
   for(int i = 0; i < 3; ++i){
-    d2 += std::pow(a[i] - b[i], 2);
+    d2 += pow(a[i] - b[i], 2);
   }
-  return std::sqrt(d2);
+  return sqrt(d2);
 }
 
 
-Eigen::MatrixXd TransformPointCloud (const Eigen::MatrixXd &cloud,
+MatrixXd TransformPointCloud (const MatrixXd &cloud,
                                      TransformT tf){
-  Eigen::Vector3d trans(tf(0),tf(1),tf(2));
+  Vector3d trans(tf(0),tf(1),tf(2));
   Matrix3d rot;
-  rot = Eigen::AngleAxisd(tf(3), Eigen::Vector3d::UnitX())
-    * Eigen::AngleAxisd(tf(4), Eigen::Vector3d::UnitY())
-    * Eigen::AngleAxisd(tf(5), Eigen::Vector3d::UnitZ());
+  rot = AngleAxisd(tf(3), Vector3d::UnitX())
+    * AngleAxisd(tf(4), Vector3d::UnitY())
+    * AngleAxisd(tf(5), Vector3d::UnitZ());
 
   return (rot * cloud.transpose()).transpose().rowwise() + trans.transpose();
 }
@@ -325,7 +317,7 @@ public:
     return d_[i - 1];
   }
 private:
-  std::vector<double> d_;
+  vector<double> d_;
 };
 
 tuple<double, JacobianT, HessianT> computeDerivative
@@ -473,14 +465,14 @@ public:
   int neighbor_id;
   int root_id = -1;
 
-  void CreateMap(const Eigen::MatrixXd &cloud){
+  void CreateMap(const MatrixXd &cloud){
     // reset k-d tree.
     leaves.clear();
     nodes_map.clear();
 
     // NDT Map Generate
     // search min max point
-    float min_p[3] = {std::numeric_limits<float>::max()};
+    float min_p[3] = {numeric_limits<float>::max()};
     float max_p[3] = {0};
     for(unsigned int i=0;i<cloud.rows();++i){
       for(int j = 0; j < 3; ++j){
@@ -497,8 +489,8 @@ public:
     float max_b[3];
     float div_b[3];
     for(int i=0;i<3;i++){
-      min_b[i] = static_cast<int>(std::floor(min_p[i] * inverse_leaf_size));
-      max_b[i] = static_cast<int>(std::floor(max_p[i] * inverse_leaf_size));
+      min_b[i] = static_cast<int>(floor(min_p[i] * inverse_leaf_size));
+      max_b[i] = static_cast<int>(floor(max_p[i] * inverse_leaf_size));
       div_b[i] = max_b[i] - min_b[i] + 1;
     }
 
@@ -513,7 +505,7 @@ public:
       int axis_v_index[3];
       for(unsigned int j = 0; j < 3; ++j){
         axis_v_index[j] = static_cast<int>
-          (std::floor
+          (floor
            (cloud(i, j) * inverse_leaf_size) -
            static_cast<float>(min_b[j])
            );
@@ -530,7 +522,7 @@ public:
         leaves[map_id].mean[j] += cloud(i, j);
     }
 
-    std::vector<int> erase_list;
+    vector<int> erase_list;
     for(auto iter = leaves.begin(); iter != leaves.end(); ++iter){
       //3点以上なら平均計算それ以下なら削除
       if(5 <= iter->second.points){
@@ -554,7 +546,7 @@ public:
       int axis_v_index[3];
       for(unsigned int j = 0; j < 3; ++j)
         axis_v_index[j] = static_cast<int>
-          (std::floor(cloud(i, j) * inverse_leaf_size) -
+          (floor(cloud(i, j) * inverse_leaf_size) -
            static_cast<float>(min_b[j]));
 
       int map_id = 0;
@@ -640,10 +632,10 @@ public:
     //木を作る
 	root_id=-1;
     nodes.resize(leaves.size());
-	std::vector<std::vector<int>> axis_sort_ids(3,std::vector<int>(leaves.size()));
+	vector<vector<int>> axis_sort_ids(3,vector<int>(leaves.size()));
 	vector<point_with_id> point_with_ids(leaves.size());
     int point_count = 0;
-    std::vector<int> index_map;
+    vector<int> index_map;
     index_map.resize(leaves.size());
 	for(auto iter = leaves.begin(); iter != leaves.end(); ++iter){//voxel
         index_map[point_count] = iter->first;
@@ -688,21 +680,21 @@ public:
   }
 
   void searchRecursive(const float* query_position,
-                       const std::map <int, Leaf> &leaves,
-                       const std::map <int, node> &tree,
+                       const map <int, Leaf> &leaves,
+                       const map <int, node> &tree,
                        const int &node_id,
                        double &min_dist){
     // reach leave.
     if(node_id < 0){
       return;
     }
-    // std::cout << " node_id = " << node_id;
+    // cout << " node_id = " << node_id;
     auto tree_iter = tree.find(node_id);
     auto leaf_iter = leaves.find(node_id);
 
     node n = tree_iter->second;
     Leaf l = leaf_iter->second;
-    // std::cout << "dist" << std::endl;
+    // cout << "dist" << endl;
     double dist = EuclidDist3D(l.mean, query_position);
 
     if(dist < min_dist){
@@ -712,7 +704,7 @@ public:
 
     int next_id;
     int opp_id;
-    // std::cout << "left&right" << std::endl;
+    // cout << "left&right" << endl;
     if(query_position[n.axis] < l.mean[n.axis]){
       next_id = n.left_id;///ここ見る
       opp_id = n.right_id;
@@ -723,13 +715,13 @@ public:
 
     searchRecursive(query_position, leaves, tree, next_id, min_dist);
 
-    double diff = std::fabs(query_position[n.axis] - l.mean[n.axis]);
+    double diff = fabs(query_position[n.axis] - l.mean[n.axis]);
     if (diff < min_dist)
       searchRecursive(query_position, leaves, tree, opp_id, min_dist);
   }
 
   TransformT Align(TransformT init_trans,
-                   const Eigen::MatrixXd &cloud,
+                   const MatrixXd &cloud,
                    const unsigned int &max_iterations){
     unsigned int iterations = 0;
     double update_norm;
@@ -744,7 +736,7 @@ public:
       JacobianT iter_jacobian = JacobianT::Zero();
       HessianT iter_hessian = HessianT::Zero();
 
-      Eigen::MatrixXd tf_cloud = TransformPointCloud(cloud, tf);
+      MatrixXd tf_cloud = TransformPointCloud(cloud, tf);
 
       JacobianCoefficientsT jacobian_coefficients;
       HessianCoefficientsT hessian_coefficients;
@@ -838,8 +830,8 @@ public:
   }
 
   void rangeSearchRecursive(const float* query_position,
-                            const std::map <int, Leaf> &leaves,
-                            const std::map <int, node> &tree,
+                            const map <int, Leaf> &leaves,
+                            const map <int, node> &tree,
                             const int &node_id,
                             double &search_range){
     // reach leave.
@@ -867,23 +859,23 @@ public:
     }
 
     rangeSearchRecursive(query_position, leaves, tree, next_id, search_range);
-    double diff = std::fabs(query_position[n.axis] - l.mean[n.axis]);
+    double diff = fabs(query_position[n.axis] - l.mean[n.axis]);
     if (diff < search_range)
       rangeSearchRecursive(query_position, leaves, tree, opp_id, search_range);
   }
 
 
 #ifdef DEBUG
-  std::vector<JacobianT> jacobian_vector;
-  std::vector<JacobianT> jacobian_vector_sum;
-  std::vector<TransformT> update_vector;
-  std::vector<HessianT> hessian_vector;
+  vector<JacobianT> jacobian_vector;
+  vector<JacobianT> jacobian_vector_sum;
+  vector<TransformT> update_vector;
+  vector<HessianT> hessian_vector;
 #endif // DEBUG
 
-  std::vector<int> neighbor_list;
-  std::map<int, node> nodes_map;
-  std::map<int, Leaf> leaves;
-  std::vector<node> nodes;
+  vector<int> neighbor_list;
+  map<int, node> nodes_map;
+  map<int, Leaf> leaves;
+  vector<node> nodes;
 };
 
 #endif // __NDT_SCAN_MATCHER_HPP__
