@@ -51,7 +51,7 @@ p::list convertEigenToList(const MatrixXd &src){
 class NDT{
 public:
   void set_leaf_size(float leaf_size_){
-    leaf_size = leaf_size_;
+    calc.leaf_size = leaf_size_;
   }
 
   void create_map(np::ndarray &reference_pc_py){

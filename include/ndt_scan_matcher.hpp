@@ -26,17 +26,6 @@ using CovarianceMatrixT = Matrix<double, 3, 3>;
 using PointT = Matrix<double, 3, 1>;
 using PointTT = Matrix<double, 1, 3>;
 
-TransformT init_trans;//イテレーション終了時とコールバックで更新
-double transformation_epsilon = 0.01;
-double leaf_size = 0.08;
-double output_prob = 0.055;
-
-// ros::Publisher vis_pub,vis_pub2;
-// ros::Publisher pose_pub,cloud_pub;
-int sort_axis=0;
-int neighbor_id;
-int root_id = -1;
-
 typedef struct
 {
   int	id;
@@ -65,20 +54,13 @@ typedef struct
   // Eigen::Vector3f evals;
 } Leaf;
 
-int AxisSort(const void * n1, const void * n2)
+bool AxisSort(const unsigned int &sort_axis, const point_with_id &n1, const point_with_id &n2)
 {
-  if (((point_with_id *)n1)->pos[sort_axis] > ((point_with_id *)n2)->pos[sort_axis])
-	{
-      return 1;
-	}
-  else if (((point_with_id *)n1)->pos[sort_axis] < ((point_with_id *)n2)->pos[sort_axis])
-	{
-      return -1;
-	}
-  else
-	{
-      return 0;
-	}
+  if (n1.pos[sort_axis] > n2.pos[sort_axis]){
+    return true;
+  }else{
+    return false;
+  }
 }
 
 int eigenJacobiMethod(float *a, float *v, int n, float eps = 1e-8, int iter_max = 100)
@@ -310,46 +292,6 @@ double EuclidDist3D(const float* a, const float* b){
   return std::sqrt(d2);
 }
 
-void searchRecursive(const float* query_position,
-                     const std::map <int, Leaf> &leaves,
-                     const std::map <int, node> &tree,
-                     const int &node_id,
-                     double &min_dist){
-  // reach leave.
-  if(node_id < 0){
-    return;
-  }
-  // std::cout << " node_id = " << node_id;
-  auto tree_iter = tree.find(node_id);
-  auto leaf_iter = leaves.find(node_id);
-
-  node n = tree_iter->second;
-  Leaf l = leaf_iter->second;
-  // std::cout << "dist" << std::endl;
-  double dist = EuclidDist3D(l.mean, query_position);
-
-  if(dist < min_dist){
-    min_dist = dist;
-    neighbor_id = node_id;
-  }
-
-  int next_id;
-  int opp_id;
-  // std::cout << "left&right" << std::endl;
-  if(query_position[n.axis] < l.mean[n.axis]){
-    next_id = n.left_id;///ここ見る
-    opp_id = n.right_id;
-  }else{
-    next_id = n.right_id;///ここ見る
-    opp_id = n.left_id;
-  }
-
-  searchRecursive(query_position, leaves, tree, next_id, min_dist);
-
-  double diff = std::fabs(query_position[n.axis] - l.mean[n.axis]);
-  if (diff < min_dist)
-    searchRecursive(query_position, leaves, tree, opp_id, min_dist);
-}
 
 Eigen::MatrixXd TransformPointCloud (const Eigen::MatrixXd &cloud,
                                      TransformT tf){
@@ -525,6 +467,12 @@ void pointDerivatives(PointT & point,
 
 class NDTCalc{
 public:
+  double transformation_epsilon = 0.01;
+  double leaf_size = 0.08;
+  double output_prob = 0.055;
+  int neighbor_id;
+  int root_id = -1;
+
   void CreateMap(const Eigen::MatrixXd &cloud){
     // reset k-d tree.
     leaves.clear();
@@ -693,7 +641,7 @@ public:
 	root_id=-1;
     nodes.resize(leaves.size());
 	std::vector<std::vector<int>> axis_sort_ids(3,std::vector<int>(leaves.size()));
-	point_with_id point_with_ids[leaves.size()];
+	vector<point_with_id> point_with_ids(leaves.size());
     int point_count = 0;
     std::vector<int> index_map;
     index_map.resize(leaves.size());
@@ -705,8 +653,11 @@ public:
 		point_with_ids[point_count].pos[2] = iter->second.mean[2];
         point_count++;
 	}
-	for(sort_axis=0; sort_axis<3; sort_axis++){
-		qsort(point_with_ids, leaves.size(), sizeof(point_with_id), AxisSort);
+
+	for(unsigned int sort_axis=0; sort_axis<3; sort_axis++){
+      sort(point_with_ids.begin(), point_with_ids.end(),
+           [&](const point_with_id &n1, const point_with_id &n2)
+           {return AxisSort(sort_axis, n1, n2);});
 		for (unsigned int i=0 ; i < leaves.size() ; i++){
 			axis_sort_ids[sort_axis][i]=point_with_ids[i].id;
 		}
@@ -736,6 +687,46 @@ public:
 	}
   }
 
+  void searchRecursive(const float* query_position,
+                       const std::map <int, Leaf> &leaves,
+                       const std::map <int, node> &tree,
+                       const int &node_id,
+                       double &min_dist){
+    // reach leave.
+    if(node_id < 0){
+      return;
+    }
+    // std::cout << " node_id = " << node_id;
+    auto tree_iter = tree.find(node_id);
+    auto leaf_iter = leaves.find(node_id);
+
+    node n = tree_iter->second;
+    Leaf l = leaf_iter->second;
+    // std::cout << "dist" << std::endl;
+    double dist = EuclidDist3D(l.mean, query_position);
+
+    if(dist < min_dist){
+      min_dist = dist;
+      neighbor_id = node_id;
+    }
+
+    int next_id;
+    int opp_id;
+    // std::cout << "left&right" << std::endl;
+    if(query_position[n.axis] < l.mean[n.axis]){
+      next_id = n.left_id;///ここ見る
+      opp_id = n.right_id;
+    }else{
+      next_id = n.right_id;///ここ見る
+      opp_id = n.left_id;
+    }
+
+    searchRecursive(query_position, leaves, tree, next_id, min_dist);
+
+    double diff = std::fabs(query_position[n.axis] - l.mean[n.axis]);
+    if (diff < min_dist)
+      searchRecursive(query_position, leaves, tree, opp_id, min_dist);
+  }
 
   TransformT Align(TransformT init_trans,
                    const Eigen::MatrixXd &cloud,
