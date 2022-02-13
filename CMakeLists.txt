@@ -11,10 +11,10 @@ set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -O3 -fopenmp -std=c++1y ")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -O3 -fopenmp -std=c++1y")
-# set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -g3 -std=c++1y ")
-# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -g3 -std=c++1y")
+# set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -O3 -fopenmp -std=c++1y ")
+# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -O3 -fopenmp -std=c++1y")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -g3 -std=c++1y ")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -g3 -std=c++1y")
 
 
 if(NOT DEFINED python_version)

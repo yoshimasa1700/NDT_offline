@@ -4,6 +4,7 @@ import time
 import copy
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 from mpl_toolkits.mplot3d import Axes3D
 from scipy.spatial.transform import Rotation
 import open3d as o3d
@@ -13,26 +14,52 @@ script_dir = osp.dirname(osp.abspath(__file__))
 sys.path.append(osp.join(script_dir, "build"))
 import libndt
 
-# leaf_size = 0.05  # for bunny
-leaf_size = 5.0  # for car
+
+# leaf_size = 0.08  # for bunny
+# leaf_size = 5.0  # for car
+leaf_size = 1.0  # for room
 
 
-def visualize_pc(ax, pc, label, marker='.', markersize=1):
+def visualize_pc(ax, pc, label, marker='.', markersize=5):
     ax.scatter3D(pc[:, 0], pc[:, 1], pc[:, 2], label=label,
                  marker=marker, s=markersize)
 
 
 # random sample point
 def create_random_pc():
+
+    count = 10
+
+    center_list = [
+        [x, 0, 0]
+        for x in np.linspace(0, 9.0, count)]
+
+    center_list.extend([
+        [5, y, 0]
+        for y in np.linspace(-5, 5, count)])
+
     sample_count = 50
-    mu = 0
-    sigma = 1
-    return np.random.normal(mu, sigma, (sample_count, 3)).astype(np.float32)
+
+    sigma = [0.2, 0.2, 0.1]
+
+    pc = []
+
+    for center in center_list:
+        pc.append(np.concatenate(
+            [[np.random.normal(c, s, sample_count).astype(np.float32)]
+             for s, c in zip(sigma, center)]
+            ).T)
+    pc = np.concatenate(pc)
+    pc_list = pc.tolist()
+
+    pc = np.array(pc_list).astype(np.float32).reshape((-1, 3))
+
+    return pc.astype(np.float32)
 
 
 def load_pc_from_pcd(path, voxel_filter=False):
     pcd = o3d.io.read_point_cloud(path)
-    pcd = pcd.voxel_down_sample(voxel_size=2.0)
+    pcd = pcd.voxel_down_sample(voxel_size=0.2)
     return np.asarray(pcd.points).astype(np.float32), pcd
 
 
@@ -68,28 +95,92 @@ def convert_pc(transform, pc):
     euler = np.array(transform[3: 6])
     rot = Rotation.from_euler('zyx', euler, degrees=True)
     trans = np.array(transform[0: 3])
+
+    dest = copy.deepcopy(pc)
+
     return np.apply_along_axis(
         lambda x: rot.apply(x) + trans,
-        1, pc).astype(np.float32)
+        1, dest).astype(np.float32)
+
+
+def visualize_elipse(ax, rx, ry, rz, cx, cy, cz):
+    # Set of all spherical angles:
+    u = np.linspace(0, 2 * np.pi, 100)
+    v = np.linspace(0, np.pi, 100)
+
+    # Cartesian coordinates that correspond to the spherical angles:
+    # (this is the equation of an ellipsoid):
+    x = rx * np.outer(np.cos(u), np.sin(v)) + cx
+    y = ry * np.outer(np.sin(u), np.sin(v)) + cy
+    z = rz * np.outer(np.ones_like(u), np.cos(v)) + cz
+
+    # Plot:
+    ax.plot_surface(x, y, z,  rstride=4, cstride=4, color='g', alpha=0.5)
 
 
 def visualize_result(ndt, reference_pc, scan_pc, registerd_pc):
     # Get intermidiate values.
-    # jacobian = np.array(ndt.get_jacobian_list()).reshape((-1, 6))
-    # hessian = np.array(ndt.get_hessian_list()).reshape((-1, 6, 6))
-    # jacobians_sum = np.array(ndt.get_jacobian_sum_list()).reshape((-1, 6))
-    # update = np.array(ndt.get_update_list()).reshape((-1, 6))
+    jacobian = np.array(ndt.get_jacobian_list()).reshape((-1, 6))
+    hessian = np.array(ndt.get_hessian_list()).reshape((-1, 6, 6))
+    jacobians_sum = np.array(ndt.get_jacobian_sum_list()).reshape((-1, 6))
+    hessian_sum = np.array(ndt.get_hessian_sum_list()).reshape((-1, 6, 6))
+    update = np.array(ndt.get_update_list()).reshape((-1, 6))
+    score = ndt.get_score_list()
+    map_data = ndt.get_map()
 
     # Start plot result
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
 
+    # def plot(data):
+    #     ax.cla()
+
+    #     idx = data % (update.shape[0] + 1)
+    #     # print("idx: {} ,score: {}".format(idx, score[idx]))
+    #     # print("idx: {} ,jacobian: {}".format(idx, jacobians_sum[idx]))
+    #     # print("idx: {} ,hessian: {}".format(idx, hessian_sum[idx]))
+    #     # print("idx: {} ,tf: {}".format(idx, update[idx]))
+
+    #     if idx != 0:
+    #         registerd_pc = convert_pc(update[idx-1], scan_pc)
+    #     else:
+    #         registerd_pc = scan_pc
+
+    #     visualize_pc(ax, reference_pc, "reference")
+    #     visualize_pc(ax, scan_pc, "scan")
+    #     visualize_pc(ax, registerd_pc, "registered")
+
+    #     center_points = np.array([g[0] for g in map_data])
+    #     # visualize_pc(ax, center_points, "grid center", marker='^', markersize=20)
+
+    #     covs = np.array([g[1] for g in map_data])
+    #     # for cov, cp in zip(covs, center_points):
+    #     #     visualize_elipse(ax, cov[0], cov[1], cov[2], cp[0], cp[1], cp[2])
+
+    #     l = 10
+
+    #     ax.set_xlim(0, 10)
+    #     ax.set_ylim(-3, 3)
+    #     ax.set_zlim(-3, 3)
+
+    #     ax.legend()
+    #     ax.set_xlabel('X axis')
+    #     ax.set_ylabel('Y axis')
+    #     ax.set_zlabel('Z axis')
+    #     if idx != 0:
+    #         ax.set_title("idx: {} ,score: {}".format(idx, score[idx-1]))
+    #     else:
+    #         ax.set_title("orig point cloud")
+
+    # ani = animation.FuncAnimation(fig, plot, interval=500, frames=update.shape[0]+1)
+    # ani.save("ndt_sample.gif", writer="imagemagick")
+
     visualize_pc(ax, reference_pc, "reference")
-    visualize_pc(ax, scan_pc, "scan")
-    visualize_pc(ax, registerd_pc, "registered")
+    # visualize_pc(ax, scan_pc, "scan")
+    # visualize_pc(ax, registerd_pc, "registered")
 
     sample_count = len(reference_pc)
-    # iter_count = int(jacobian.shape[0] / sample_count)
+    iter_count = int(update.shape[0])
     # print("iteration count: {}".format(iter_count))
 
     # for ic in range(iter_count):
@@ -114,18 +205,6 @@ def visualize_result(ndt, reference_pc, scan_pc, registerd_pc):
     #           jacobians_sum[0, 2] / sample_count,
     #           color="red")
 
-    # plot update
-    # ax.quiver(0, 0, 0,
-    #           update[0, 0],
-    #           update[0, 1],
-    #           update[0, 2],
-    #           color="blue")
-
-    map_data = ndt.get_map()
-
-    center_points = np.array([g[0] for g in map_data])
-    visualize_pc(ax, center_points, "grid center", marker='^', markersize=20)
-
     # plot settings.
     ax.legend()
     ax.set_xlabel('X axis')
@@ -138,11 +217,22 @@ def visualize_result(ndt, reference_pc, scan_pc, registerd_pc):
     ax.set_yticks(ticks)
     ax.set_zticks(ticks)
 
-    l = 0.2
+    center_points = np.array([g[0] for g in map_data])
+    # visualize_pc(ax, center_points, "grid center", marker='^', markersize=20)
 
-    # ax.set_xlim(-l/2, l/2)
+    covs = np.array([g[1] for g in map_data])
+    for cov, cp in zip(covs, center_points):
+        visualize_elipse(ax, cov[0], cov[1], cov[2], cp[0], cp[1], cp[2])
+
+    l = 10
+
+    ax.set_xlim(0, 10)
+    ax.set_ylim(-3, 3)
+    ax.set_zlim(-3, 3)
+
+    # ax.set_xlim(0, l)
     # ax.set_ylim(0, l)
-    # ax.set_zlim(-l, l)
+    # ax.set_zlim(0, l)
 
     plt.show()
 
@@ -157,16 +247,17 @@ def main():
 
     # prepare reference pc
     # sample_data_path = osp.join(script_dir, "data", "bunny.pcd")
-    sample_data_path = osp.join(script_dir, "data", "downsample_map.pcd")
-    reference_pc, ref_pcd = load_pc_from_pcd(sample_data_path)
-
-    print(ref_pcd.has_colors())
-    print(len(ref_pcd.points))
+    # sample_data_path = osp.join(script_dir, "data", "downsample_map.pcd")
+    # sample_data_path = osp.join(script_dir, "data", "room_scan1.pcd")
+    # reference_pc, ref_pcd = load_pc_from_pcd(sample_data_path)
+    reference_pc = create_random_pc()
+    # reference_pc = create_fixed_grid_pc()
 
     # prepare scan pc
-    # scan_pc = convert_pc([0.006, 0.006, 0.0, 0., 0., 0.], reference_pc)
-    sample_data_path = osp.join(script_dir, "data", "scan_sample.pcd")
-    scan_pc, scan_pcd = load_pc_from_pcd(sample_data_path)
+    scan_pc = convert_pc([0.1, 0.2, 0.2, 0., 0., 0], reference_pc)
+    # sample_data_path = osp.join(script_dir, "data", "scan_sample.pcd")
+    # sample_data_path = osp.join(script_dir, "data", "room_scan2.pcd")
+    # scan_pc, scan_pcd = load_pc_from_pcd(sample_data_path)
 
     # create map
     t = time.time()
@@ -181,25 +272,19 @@ def main():
 
     registerd_pc = convert_pc(transform, scan_pc)
 
-    euler = np.array(transform[3: 6])
-    rot = Rotation.from_euler('zyx', euler, degrees=True).as_dcm()
-    trans = np.array(transform[0: 3])
-
-    print(trans)
-    print(rot)
-
-    registered_pcd = copy.deepcopy(scan_pcd)
+    # euler = np.array(transform[3: 6])
+    # rot = Rotation.from_euler('zyx', euler, degrees=True).as_dcm()
+    # trans = np.array(transform[0: 3])
+    # registered_pcd = copy.deepcopy(scan_pcd)
     # registered_pcd.rotate(rot)
     # registered_pcd.translate(trans)
 
-    s_color = np.array([[255, 0, 0] for _ in range(len(scan_pcd.points))])
-    scan_pcd.colors = o3d.utility.Vector3dVector(s_color)
-
-    r_color = np.array([[0, 0, 255] for _ in range(len(registered_pcd.points))])
-    registered_pcd.colors = o3d.utility.Vector3dVector(r_color)
-
-    # o3d.visualization.draw_geometries([ref_pcd, scan_pcd, registered_pcd])
-    o3d.visualization.draw_geometries([ref_pcd, registered_pcd])
+    # s_color = np.array([[255, 0, 0] for _ in range(len(scan_pcd.points))])
+    # scan_pcd.colors = o3d.utility.Vector3dVector(s_color)
+    # r_color = np.array([[0, 0, 255] for _ in range(len(registered_pcd.points))])
+    # registered_pcd.colors = o3d.utility.Vector3dVector(r_color)
+    # # o3d.visualization.draw_geometries([ref_pcd, scan_pcd, registered_pcd])
+    # o3d.visualization.draw_geometries([ref_pcd, registered_pcd])
 
     # visualize result
     visualize_result(ndt, reference_pc, scan_pc, registerd_pc)

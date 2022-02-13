@@ -461,7 +461,8 @@ class NDTCalc{
 public:
   double transformation_epsilon = 0.01;
   double leaf_size = 0.08;
-  double output_prob = 0.055;
+  // double output_prob = 0.055;
+  double output_prob = 0.0001;
   int neighbor_id;
   int root_id = -1;
 
@@ -476,8 +477,9 @@ public:
     float max_p[3] = {0};
     for(unsigned int i=0;i<cloud.rows();++i){
       for(int j = 0; j < 3; ++j){
-        if(min_p[j]>cloud(i, j))
+        if(min_p[j] > cloud(i, j))
           min_p[j] = cloud(i, j);
+
         if(max_p[j]<cloud(i, j))
           max_p[j] = cloud(i, j);
       }
@@ -578,13 +580,19 @@ public:
           (cloud(i, 2) - leaves[map_id].mean[2]);
 
       }
-
     }
+
+
 
     // 逆行列計算
     erase_list.clear();
     // 3点以上なら平均計算それ以下なら削除
     for(auto iter = leaves.begin(); iter != leaves.end(); ++iter){
+
+      for(unsigned int j = 0; j < 6; ++j){
+        iter->second.params[j] /= iter->second.points;
+      }
+
       //cov作る
       CovarianceMatrixT cov;
       cov <<
@@ -744,13 +752,13 @@ public:
 
       //点ループ
       for (unsigned int point_id = 0; point_id < tf_cloud.rows(); ++point_id){
-        //点の型変換
         PointT point = tf_cloud.row(point_id);
+        PointT orig_point = cloud.row(point_id);
 
         PointJacobianT point_jacobian;
         PointHessianT point_hessian;
         pointDerivatives
-          (point,
+          (orig_point,
            jacobian_coefficients,
            hessian_coefficients,
            point_jacobian,
@@ -795,6 +803,10 @@ public:
 
           if(!exists) continue;
           PointT x_k_dash = point - mean;
+
+          if(x_k_dash.norm() > leaf_size)
+            continue;
+
           //マッチ毎にscore,jacobian,hessianの計算
 
           tuple<double, JacobianT, HessianT> iter_derivatives = computeDerivative
@@ -815,13 +827,16 @@ public:
       update = iter_hessian_inv * iter_jacobian;
       update_norm = update.norm();
 
-#ifdef DEBUG
-      jacobian_vector_sum.push_back(iter_jacobian);
-      update_vector.push_back(update);
-#endif // DEBUG
-
       //tfの再計算
       tf -= update;
+
+#ifdef DEBUG
+      jacobian_vector_sum.push_back(iter_jacobian);
+      hessian_vector_sum.push_back(iter_hessian);
+      update_vector.push_back(tf);
+      score_vector.push_back(iter_score);
+#endif // DEBUG
+
       if(iterations >= max_iterations || update_norm < transformation_epsilon)
         converged = true;
       iterations++;
@@ -868,7 +883,9 @@ public:
 #ifdef DEBUG
   vector<JacobianT> jacobian_vector;
   vector<JacobianT> jacobian_vector_sum;
+  vector<HessianT> hessian_vector_sum;
   vector<TransformT> update_vector;
+  vector<double> score_vector;
   vector<HessianT> hessian_vector;
 #endif // DEBUG
 
