@@ -155,7 +155,7 @@ def main():
     ndt = libndt.NDT()
     ndt.set_leaf_size(leaf_size)
 
-    trans = np.array([[1.0, 0, 0, 0, 0, 0]], dtype=np.float32)
+    trans = np.array([[0.0, 0, 0, 0, 0, 0]], dtype=np.float32)
 
     x_list = np.arange(-7.5, 7.5, 0.1)
 
