@@ -50,7 +50,8 @@ def create_random_pc():
 
 def load_pc_from_pcd(path, voxel_filter=False):
     pcd = o3d.io.read_point_cloud(path)
-    pcd = pcd.voxel_down_sample(voxel_size=0.2)
+    if voxel_filter:
+        pcd = pcd.voxel_down_sample(voxel_size=0.2)
     return np.asarray(pcd.points).astype(np.float32), pcd
 
 

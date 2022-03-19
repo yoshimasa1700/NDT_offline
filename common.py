@@ -7,7 +7,7 @@ import open3d as o3d
 # Transform scan_pc by calculated transform
 def convert_pc(transform, pc, degrees=False):
     euler = np.array(transform[3: 6])
-    rot = Rotation.from_euler('zyx', euler, degrees=degrees)
+    rot = Rotation.from_euler('xyz', euler, degrees=degrees)
     trans = np.array(transform[0: 3])
 
     dest = copy.deepcopy(pc)
@@ -20,7 +20,7 @@ def convert_pc(transform, pc, degrees=False):
 def convert_pcd(pcd, transform, degrees=False):
     out = copy.deepcopy(pcd)
 
-    out = out.rotate(Rotation.from_euler('zyx', transform[3: 6],
+    out = out.rotate(Rotation.from_euler('xyz', transform[3: 6],
                                          degrees=degrees).as_dcm())
     out = out.translate(np.array(transform[0: 3]))
 

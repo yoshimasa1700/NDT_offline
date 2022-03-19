@@ -19,10 +19,11 @@ script_dir = osp.dirname(osp.abspath(__file__))
 
 sys.path.append(osp.join(script_dir, "build"))
 import libndt
+import time
 
 # leaf_size = 0.08  # for bunny
 # leaf_size = 5.0  # for car
-leaf_size = 2.0  # for room
+leaf_size = 1.0  # for room
 
 
 def visualize_pc(ax, pc, label, marker='.', markersize=10):
@@ -49,14 +50,15 @@ def main():
     # scan_pc = scan_pc[np.mod(np.arange(scan_pc.shape[0]), 2) == 0]
 
     # sample_data_path = osp.join(script_dir, "data", "scan_sample.pcd")
-    sample_data_path = osp.join(script_dir, "data", "room_scan1.pcd")
+    sample_data_path = osp.join(script_dir, "data", "room_scan2.pcd")
     # sample_data_path = osp.join(script_dir, "data", "room_scan2.pcd")
-    scan_pc, scan_pcd = pc_gen.load_pc_from_pcd(sample_data_path)
+    scan_pc, scan_pcd = pc_gen.load_pc_from_pcd(sample_data_path,
+                                                voxel_filter=False)
 
-    scan_transform = [0.2, 0.0, 0, 0, 0, 0] # xyz rpy deg
+    scan_transform = [1.79387, 0.720047, 0, 0, 0, 0.6931] # xyz rpy rad
 
-    scan_pc = common.convert_pc(scan_transform, reference_pc, degrees=True)
-    scan_pcd = common.convert_pcd(scan_pcd, scan_transform, degrees=True)
+    scan_pc = common.convert_pc(scan_transform, scan_pc)
+    scan_pcd = common.convert_pcd(scan_pcd, scan_transform)
 
     # create map
     t = time.time()
@@ -64,7 +66,7 @@ def main():
     print("create_map: {}".format(time.time() - t))
 
     # Run registration and get result transform.
-    max_iteration_count = 100
+    max_iteration_count = 1
     t = time.time()
     transform = ndt.registration(scan_pc, max_iteration_count)
 
@@ -79,8 +81,71 @@ def main():
     registered_pcd = common.set_color_pcd([0, 0, 255], registered_pcd)
     ref_pcd = common.set_color_pcd([0, 255, 0], ref_pcd)
 
-    o3d.visualization.draw_geometries([ref_pcd, scan_pcd, registered_pcd])
-    o3d.visualization.draw_geometries([ref_pcd, registered_pcd])
+    map_data = ndt.get_map()
+    center_points = np.array([g[0] for g in map_data])
+    covs = np.array([g[1] for g in map_data])
+
+    map_viz = []
+
+    for cov, cp in zip(covs, center_points):
+        std_dev = list(map(math.sqrt, cov[0: 3]))
+        mesh_sphere = o3d.geometry.TriangleMesh.create_sphere(radius=1.0)
+        mesh_sphere.compute_vertex_normals()
+        mesh_sphere.vertices = o3d.utility.Vector3dVector(
+            np.asarray(mesh_sphere.vertices) * np.array(std_dev) + np.array(cp))
+        map_viz.append(mesh_sphere)
+
+    # o3d.visualization.draw_geometries(map_viz)
+
+    map_viz.append(ref_pcd)
+
+    # o3d.visualization.draw_geometries(map_viz)
+
+    map_viz.append(registered_pcd)
+
+    # vis = o3d.visualization.Visualizer()
+    # vis.create_window()
+
+    # for mv in map_viz:
+    #     vis.add_geometry(mv)
+
+    # count = 0
+
+    # while True:
+    #     # Get intermidiate values.
+    #     jacobian = np.array(ndt.get_jacobian_list()).reshape((-1, 6))
+    #     hessian = np.array(ndt.get_hessian_list()).reshape((-1, 6, 6))
+    #     jacobians_sum = np.array(ndt.get_jacobian_sum_list()).reshape((-1, 6))
+    #     hessian_sum = np.array(ndt.get_hessian_sum_list()).reshape((-1, 6, 6))
+    #     update = np.array(ndt.get_update_list()).reshape((-1, 6))
+    #     score = ndt.get_score_list()
+    #     map_data = ndt.get_map()
+
+    #     idx = count % (update.shape[0] + 1)
+    #     count += 1
+
+    #     if idx != 0:
+    #         registered_pcd = common.convert_pcd(scan_pcd, update[idx-1])
+    #         print("idx: {} ,score: {}".format(idx, score[idx-1]))
+    #         print("idx: {} ,jacobian: {}".format(idx, jacobians_sum[idx-1]))
+    #         print("idx: {} ,hessian: {}".format(idx, hessian_sum[idx-1]))
+    #         print("idx: {} ,tf: {}".format(idx, update[idx-1]))
+    #     else:
+    #         registered_pcd = scan_pcd
+
+    #     vis.update_geometry(registered_pcd)
+    #     vis.poll_events()
+    #     vis.update_renderer()
+
+    #     time.sleep(1)
+
+    # o3d.visualization.draw_geometries(map_viz)
+    # o3d.visualization.draw_geometries_with_animation_callback(
+    # map_viz, animation)
+
+    map_viz.append(scan_pcd)
+
+    o3d.visualization.draw_geometries(map_viz)
 
 
 if __name__ == "__main__":
