@@ -56,3 +56,20 @@ target_link_libraries(${PROJECT_NAME}
   ${PYTHON_LIBRARIES}
   Eigen3::Eigen
 )
+
+find_package(GTest REQUIRED)
+
+include_directories(
+  include
+  ${GTEST_INCLUDE_DIRS}
+  )
+
+add_executable(test_sample
+  test/test.cpp
+  )
+
+target_link_libraries(test_sample
+  GTest::GTest GTest::Main
+  ${Boost_LIBRARIES}
+  Eigen3::Eigen
+  )
