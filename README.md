@@ -23,5 +23,5 @@ python3 ndt_sample.py
 ### run(point cloud data)
 
 ```shell
-python3 ndt_sample_open3d.py
+python3 ndt_sample_open3d.py [setting yaml file]
 ```

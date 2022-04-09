@@ -3,7 +3,9 @@ import sys
 import time
 import math
 import copy
+import yaml
 import numpy as np
+from pprint import pprint
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from mpl_toolkits.mplot3d import Axes3D
@@ -22,8 +24,8 @@ import libndt
 import time
 
 # leaf_size = 0.08  # for bunny
-# leaf_size = 5.0  # for car
-leaf_size = 1.0  # for room
+leaf_size = 5.0  # for car
+# leaf_size = 1.0  # for room
 
 
 def visualize_pc(ax, pc, label, marker='.', markersize=10):
@@ -35,30 +37,32 @@ def main():
     # definition
     # pc: point cloud
 
+    setting_file_path = sys.argv[1]
+
+    if not osp.exists(setting_file_path):
+        raise OSError(-1, "{} not found".format(setting_file_path))
+    with open(setting_file_path) as f:
+        setting = yaml.safe_load(f)
+
+    pprint(setting)
+
     # init ndt lib
     ndt = libndt.NDT()
-    ndt.set_leaf_size(leaf_size)
+    ndt.set_leaf_size(setting["leaf_size"])
 
-    # prepare reference pc
-    # sample_data_path = osp.join(script_dir, "data", "bunny.pcd")
-    # sample_data_path = osp.join(script_dir, "data", "downsample_map.pcd")
-    sample_data_path = osp.join(script_dir, "data", "room_scan1.pcd")
-    reference_pc, ref_pcd = pc_gen.load_pc_from_pcd(sample_data_path)
+    # load reference pc
+    reference_pc, ref_pcd = pc_gen.load_pc_from_pcd(
+        osp.join(script_dir, setting["map_data"]))
 
-    # prepare scan pc
-    # scan_pc = convert_pc([0.4, -0.4, 0.0, 0.0, 0., 3.0], reference_pc)
-    # scan_pc = scan_pc[np.mod(np.arange(scan_pc.shape[0]), 2) == 0]
+    # load scan pc
+    scan_pc, scan_pcd = pc_gen.load_pc_from_pcd(
+        osp.join(script_dir, setting["scan_data"]))
 
-    # sample_data_path = osp.join(script_dir, "data", "scan_sample.pcd")
-    sample_data_path = osp.join(script_dir, "data", "room_scan2.pcd")
-    # sample_data_path = osp.join(script_dir, "data", "room_scan2.pcd")
-    scan_pc, scan_pcd = pc_gen.load_pc_from_pcd(sample_data_path,
-                                                voxel_filter=False)
-
-    scan_transform = [1.79387, 0.720047, 0, 0, 0, 0.6931] # xyz rpy rad
-
+    # transform scan pc by initial pose
+    scan_transform = setting["init_pose"]
     scan_pc = common.convert_pc(scan_transform, scan_pc)
     scan_pcd = common.convert_pcd(scan_pcd, scan_transform)
+    scan_pc = scan_pc[~np.isnan(scan_pc).any(axis=1), :]
 
     # create map
     t = time.time()
@@ -66,7 +70,7 @@ def main():
     print("create_map: {}".format(time.time() - t))
 
     # Run registration and get result transform.
-    max_iteration_count = 1
+    max_iteration_count = 10
     t = time.time()
     transform = ndt.registration(scan_pc, max_iteration_count)
 
@@ -143,6 +147,7 @@ def main():
     # o3d.visualization.draw_geometries_with_animation_callback(
     # map_viz, animation)
 
+    print(scan_pcd)
     map_viz.append(scan_pcd)
 
     o3d.visualization.draw_geometries(map_viz)

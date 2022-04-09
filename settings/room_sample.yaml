@@ -1,0 +1,10 @@
+leaf_size: 1.
+map_data: data/room_scan1.pcd
+scan_data: data/room_scan2.pcd
+init_pose:
+  - 1.79387
+  - 0.720047
+  - 0.
+  - 0.
+  - 0.
+  - 0.6931

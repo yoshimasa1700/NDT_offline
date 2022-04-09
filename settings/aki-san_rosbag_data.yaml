@@ -1,0 +1,10 @@
+leaf_size: 5.
+map_data: data/scan_sample_000000.pcd
+scan_data: data/scan_sample_000001.pcd
+init_pose:
+  - 0.
+  - 0.
+  - 0.
+  - 0.
+  - 0.
+  - 0.
