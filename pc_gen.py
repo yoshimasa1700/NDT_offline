@@ -48,11 +48,24 @@ def create_random_pc():
     return pc.astype(np.float32)
 
 
+def filter_nan_point(pc_np):
+    return pc_np[~np.isnan(pc_np).any(axis=1), :]
+
+
 def load_pc_from_pcd(path, voxel_filter=False):
     pcd = o3d.io.read_point_cloud(path)
+
     if voxel_filter:
         pcd = pcd.voxel_down_sample(voxel_size=0.2)
-    return np.asarray(pcd.points).astype(np.float32), pcd
+
+    return filter_nan_point(np.asarray(pcd.points).astype(np.float32))
+
+
+def convert_np2o3d(pc_np):
+    pc_o3d = o3d.geometry.PointCloud()
+    pc_o3d.points = o3d.utility.Vector3dVector(pc_np)
+
+    return pc_o3d
 
 
 def create_random_fixed_pc():

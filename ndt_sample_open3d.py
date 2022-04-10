@@ -23,10 +23,6 @@ sys.path.append(osp.join(script_dir, "build"))
 import libndt
 import time
 
-# leaf_size = 0.08  # for bunny
-leaf_size = 5.0  # for car
-# leaf_size = 1.0  # for room
-
 
 def visualize_pc(ax, pc, label, marker='.', markersize=10):
     ax.scatter3D(pc[:, 0], pc[:, 1], pc[:, 2], label=label,
@@ -51,18 +47,16 @@ def main():
     ndt.set_leaf_size(setting["leaf_size"])
 
     # load reference pc
-    reference_pc, ref_pcd = pc_gen.load_pc_from_pcd(
+    reference_pc = pc_gen.load_pc_from_pcd(
         osp.join(script_dir, setting["map_data"]))
 
     # load scan pc
-    scan_pc, scan_pcd = pc_gen.load_pc_from_pcd(
+    scan_pc = pc_gen.load_pc_from_pcd(
         osp.join(script_dir, setting["scan_data"]))
 
     # transform scan pc by initial pose
     scan_transform = setting["init_pose"]
     scan_pc = common.convert_pc(scan_transform, scan_pc)
-    scan_pcd = common.convert_pcd(scan_pcd, scan_transform)
-    scan_pc = scan_pc[~np.isnan(scan_pc).any(axis=1), :]
 
     # create map
     t = time.time()
@@ -79,11 +73,13 @@ def main():
     print("registration: {}".format(time.time() - t))
 
     registerd_pc = common.convert_pc(transform, scan_pc)
-    registered_pcd = common.convert_pcd(scan_pcd, transform)
 
-    scan_pcd = common.set_color_pcd([255, 0, 0], scan_pcd)
-    registered_pcd = common.set_color_pcd([0, 0, 255], registered_pcd)
-    ref_pcd = common.set_color_pcd([0, 255, 0], ref_pcd)
+    scan_pcd = common.set_color_pcd(
+        [255, 0, 0], pc_gen.convert_np2o3d(scan_pc))
+    registered_pcd = common.set_color_pcd(
+        [0, 0, 255], pc_gen.convert_np2o3d(registerd_pc))
+    ref_pcd = common.set_color_pcd(
+        [0, 255, 0], pc_gen.convert_np2o3d(reference_pc))
 
     map_data = ndt.get_map()
     center_points = np.array([g[0] for g in map_data])
@@ -99,11 +95,7 @@ def main():
             np.asarray(mesh_sphere.vertices) * np.array(std_dev) + np.array(cp))
         map_viz.append(mesh_sphere)
 
-    # o3d.visualization.draw_geometries(map_viz)
-
     map_viz.append(ref_pcd)
-
-    # o3d.visualization.draw_geometries(map_viz)
 
     map_viz.append(registered_pcd)
 

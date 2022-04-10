@@ -770,14 +770,14 @@ public:
         for(int i = 0; i < 3; ++i)
           target[i] = tf_cloud(point_id, i);
 
-        // rangeSearchRecursive(target, leaves, nodes_map, root_id, leaf_size);
+        rangeSearchRecursive(target, leaves, nodes_map, root_id, leaf_size);
         double temp = numeric_limits<double>::max();
         searchRecursive(target, leaves, nodes_map, root_id, temp);
 
         //近傍ループ
-        // for (unsigned int neighbor_id = 0;neighbor_id < neighbor_list.size();neighbor_id++){
-        // auto neighbor_iter = leaves.find(neighbor_list[neighbor_id]);
-        auto neighbor_iter = leaves[neighbor_id];
+        for (unsigned int neighbor_id = 0;neighbor_id < neighbor_list.size();neighbor_id++){
+            // auto neighbor_iter = leaves.find(neighbor_list[neighbor_id]);
+            auto neighbor_iter = leaves[neighbor_id];
           //分布の型変換
           PointT mean;
           mean <<
@@ -819,7 +819,7 @@ public:
           jacobian_vector.push_back(get<1>(iter_derivatives));
           hessian_vector.push_back(get<2>(iter_derivatives));
 #endif // DEBUG
-          // } // neighbor
+          } // neighbor
       } // points
 
       //ニュートン方第2項(update)の計算
