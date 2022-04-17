@@ -99,6 +99,18 @@ def main():
 
     map_viz.append(registered_pcd)
 
+    not_found_list = ndt.get_not_found_list()
+
+    found_pcd = common.set_color_pcd(
+        [255, 0, 0],
+        pc_gen.convert_np2o3d(np.array(ndt.get_found_list())))
+    # map_viz.append(found_pcd)
+
+    not_found_pcd = common.set_color_pcd(
+        [127, 0, 255],
+        pc_gen.convert_np2o3d(np.array(ndt.get_not_found_list())))
+    # map_viz.append(not_found_pcd)
+
     # vis = o3d.visualization.Visualizer()
     # vis.create_window()
 
@@ -139,7 +151,6 @@ def main():
     # o3d.visualization.draw_geometries_with_animation_callback(
     # map_viz, animation)
 
-    print(scan_pcd)
     map_viz.append(scan_pcd)
 
     o3d.visualization.draw_geometries(map_viz)

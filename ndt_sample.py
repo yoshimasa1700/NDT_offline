@@ -57,6 +57,9 @@ def visualize_result(ndt, reference_pc, scan_pc, registerd_pc):
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
 
+    found_list = ndt.get_found_list()
+    not_found_list = ndt.get_not_found_list()
+
     def plot(data):
         ax.cla()
 
@@ -74,6 +77,9 @@ def visualize_result(ndt, reference_pc, scan_pc, registerd_pc):
         visualize_pc(ax, reference_pc, "reference")
         # visualize_pc(ax, scan_pc, "scan")
         visualize_pc(ax, registerd_pc, "registered")
+
+        # visualize_pc(ax, np.array(found_list), "found")
+        # visualize_pc(ax, np.array(not_found_list), "not found")
 
         center_points = np.array([g[0] for g in map_data])
         # visualize_pc(ax, center_points, "grid center", marker='^', markersize=20)
@@ -183,13 +189,9 @@ def main():
     ndt.set_leaf_size(leaf_size)
 
     # prepare reference pc
-    # sample_data_path = osp.join(script_dir, "data", "bunny.pcd")
-    # sample_data_path = osp.join(script_dir, "data", "downsample_map.pcd")
-    # sample_data_path = osp.join(script_dir, "data", "room_scan1.pcd")
-    # reference_pc, ref_pcd = load_pc_from_pcd(sample_data_path)
-    # reference_pc = create_random_pc()
-    # reference_pc = create_fixed_pc()
-    # reference_pc = create_random_fixed_pc()
+    # reference_pc = pc_gen.create_random_pc()
+    # reference_pc = pc_gen.create_fixed_pc()
+    # reference_pc = pc_gen.create_random_fixed_pc()
     reference_pc = pc_gen.create_fixed_grid_pc()
 
     # prepare scan pc
@@ -201,6 +203,10 @@ def main():
     t = time.time()
     ndt.create_map(reference_pc)
     print("create_map: {}".format(time.time() - t))
+
+    # point = [0.0, 0.0, 0]
+    # result = ndt.query_point(point)
+    # print(result)
 
     # Run registration and get result transform.
     max_iteration_count = 10

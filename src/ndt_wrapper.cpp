@@ -1,5 +1,6 @@
 #include <bits/stdc++.h>
 #include <boost/python.hpp>
+#include <boost/python/extract.hpp>
 #include <boost/python/numpy.hpp>
 #include <Eigen/Dense>
 #include <boost/python/tuple.hpp>
@@ -138,6 +139,62 @@ public:
     return result;
   }
 
+  p::list get_found_list(){
+    p::list result;
+
+    for(unsigned int i = 0 ; i < calc.neighbor_found_points_.size(); ++i){
+      p::list point;
+
+      point.append(calc.neighbor_found_points_[i][0]);
+      point.append(calc.neighbor_found_points_[i][1]);
+      point.append(calc.neighbor_found_points_[i][2]);
+
+      result.append(point);
+    }
+
+    return result;
+  }
+
+  p::list get_not_found_list(){
+    p::list result;
+
+    for(unsigned int i = 0 ; i < calc.neighbor_not_found_points_.size(); ++i){
+      p::list point;
+
+      point.append(calc.neighbor_not_found_points_[i][0]);
+      point.append(calc.neighbor_not_found_points_[i][1]);
+      point.append(calc.neighbor_not_found_points_[i][2]);
+
+      result.append(point);
+    }
+
+    return result;
+  }
+
+  p::list query_point(p::list query){
+    p::list result;
+    float target[3];
+    for(int i = 0; i < 3; ++i)
+      target[i] = p::extract<double>(query[i]);
+
+    calc.rangeSearchRecursive(target, calc.leaves,
+                              calc.nodes_map,
+                              calc.root_id,
+                              calc.leaf_size);
+
+    for(unsigned int i = 0; i < calc.neighbor_list.size(); ++i){
+      int neighbor_id = calc.neighbor_list[i];
+      Leaf l = calc.leaves.at(neighbor_id);
+
+      p::list point;
+      for(int j = 0; j < 3; ++j)
+        point.append(l.mean[j]);
+      result.append(point);
+    }
+
+    return result;
+  }
+
 #endif // DEBUG
 
   p::list get_map(){
@@ -231,6 +288,9 @@ BOOST_PYTHON_MODULE(libndt)
     .def("get_update_list", &NDT::get_update_list)
     .def("get_hessian_list", &NDT::get_hessian_list)
     .def("get_score_list", &NDT::get_score_list)
+    .def("get_found_list", &NDT::get_found_list)
+    .def("get_not_found_list", &NDT::get_not_found_list)
+    .def("query_point", &NDT::query_point)
 #endif // DEBUG
     .def("registration", &NDT::registration);
 }
