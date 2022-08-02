@@ -892,7 +892,7 @@ public:
                             const map <int, Leaf> &leaves,
                             const map <int, node> &tree,
                             const int &node_id,
-                            double &search_range){
+                            const double &search_range){
     // reach leave.
     if(node_id < 0){
       return;
@@ -909,18 +909,25 @@ public:
 
     int next_id;
     int opp_id;
+
+    bool need_search_opposit;
+
     if(query_position[n.axis] < l.mean[n.axis]){
       next_id = n.left_id;
       opp_id = n.right_id;
+
+      need_search_opposit = l.mean[n.axis] < query_position[n.axis] + search_range;
     }else{
       next_id = n.right_id;
       opp_id = n.left_id;
+
+      need_search_opposit = l.mean[n.axis] > query_position[n.axis] - search_range;
     }
 
     rangeSearchRecursive(query_position, leaves, tree, next_id, search_range);
-    double diff = fabs(query_position[n.axis] - l.mean[n.axis]);
-    // if (diff < search_range)
-    rangeSearchRecursive(query_position, leaves, tree, opp_id, search_range);
+
+    if(need_search_opposit)
+        rangeSearchRecursive(query_position, leaves, tree, opp_id, search_range);
   }
 
 

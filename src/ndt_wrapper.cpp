@@ -61,16 +61,20 @@ public:
     calc.CreateMap(cloud);
   }
 
-  p::list registration(np::ndarray &scan_pc_py, int max_iteration){
+  p::list registration(np::ndarray &scan_pc_py, int max_iteration, np::ndarray &initial_trans_py){
     MatrixXd scan_pc = convertNdarrayToEigen(scan_pc_py);
 
-    TransformT initial_trans = MatrixXd::Zero(6, 1);
+    MatrixXd initial_trans = convertNdarrayToEigen(initial_trans_py);
+
+    cerr << "initial_trans:" << initial_trans.row(0) << endl;
+
+    // TransformT initial_trans = MatrixXd::Zero(6, 1);
     // TransformT initial_trans;
     // initial_trans << 1.79387, 0.720047, 0, 0, 0, 0.6931;
     // initial_trans << 1.79387, 0.720047, 0, 0, 0, 1.4931;
 
     // convert matrix to pcl.
-    TransformT relative_pose = calc.Align(initial_trans, scan_pc, max_iteration);
+    TransformT relative_pose = calc.Align(initial_trans.row(0), scan_pc, max_iteration);
 
     return convertEigenToList(relative_pose);
   }
