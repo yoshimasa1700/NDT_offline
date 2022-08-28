@@ -3,6 +3,8 @@
 
 #include <bits/stdc++.h>
 #include <Eigen/Dense>
+#include <memory>
+#include <vector>
 
 #define DEBUG
 
@@ -20,42 +22,31 @@ using CovarianceMatrixT = Matrix<double, 3, 3>;
 using PointT = Matrix<double, 3, 1>;
 using PointTT = Matrix<double, 1, 3>;
 
-typedef struct
-{
-  int	id;
-  float pos[3];
-} point_with_id;
+struct Node;
+using NodePtr = shared_ptr<Node>;
 
-typedef struct
+class Leaf
 {
-  int	parent_id;
-  int left_id;
-  int right_id;
-  int axis;
-} node;
-
-typedef struct
-{
-  int	points = 0;
+public:
+  vector<Vector3d> points;
   // Vector3f mean(0, 0, 0);
-  float mean[3] = {0,0,0};
+  Vector3d mean;
   float params[6] = {0,0,0,0,0,0};//11,22,33,12,13,23
-  float inverse_params[6]={0,0,0,0,0,0};//11,22,33,12,13,23
+  CovarianceMatrixT inverse_params;
   float a[9];
   float eigen_vector[9];
   // Matrix3f cov;
   // Matrix3f evecs;
   // Vector3f evals;
-} Leaf;
+};
 
-bool AxisSort(const unsigned int &sort_axis, const point_with_id &n1, const point_with_id &n2)
+struct Node
 {
-  if (n1.pos[sort_axis] > n2.pos[sort_axis]){
-    return true;
-  }else{
-    return false;
-  }
-}
+  int idx;
+  NodePtr leftChild;
+  NodePtr rightChild;
+  unsigned int axis;
+};
 
 int eigenJacobiMethod(float *a, float *v, int n, float eps = 1e-8, int iter_max = 100)
 {
@@ -159,113 +150,115 @@ int eigenJacobiMethod(float *a, float *v, int n, float eps = 1e-8, int iter_max 
   return cnt;
 }
 
-int CreateNode(int* root_id, //
-               int point_size,
-               vector<node>& nodes,
-               vector<vector<int>> axis_sort_ids,
-               int depth,
-               int parent_id,
-               bool node_is_right)
-{
-  int group_size = axis_sort_ids[0].size();
-  int axis = depth % 3;
-  int middle = (group_size - 1) / 2;
-  int median_id = axis_sort_ids[axis][middle];
 
-  nodes[median_id].axis = axis;
-  nodes[median_id].parent_id = parent_id;
-  nodes[median_id].left_id = -1;
-  nodes[median_id].right_id = -1;
-
-  if(parent_id >= 0){ // 親あり
-    if(!node_is_right) nodes[parent_id].left_id = median_id;
-    if(node_is_right) nodes[parent_id].right_id = median_id;
-  }
-  else{ // 親なし
-    *root_id = median_id;
-  }
-
-  // have no child
-  if(group_size <= 1){
-    // cout<<"leaf"<<endl;
-    return 1;
-  }
-
-  vector<int>::iterator middle_iter(axis_sort_ids[axis].begin());
-  advance(middle_iter, middle);
-
-  vector<int> left_group(axis_sort_ids[axis].begin(), middle_iter);
-  ++middle_iter;
-
-  vector<int> right_group(middle_iter, axis_sort_ids[axis].end());
-
-  vector<vector<int>> left_axis_sort_ids(3, vector<int>(left_group.size()));
-  vector<vector<int>> right_axis_sort_ids(3, vector<int>(right_group.size()));
-
-  vector<int> next_group(point_size,0);
-  vector<int> left_axis_count(3, 0);
-  vector<int> right_axis_count(3, 0);
-  for(unsigned int i = 0; i < left_group.size(); i++){
-    left_axis_sort_ids[axis][i] = left_group[i];
-    next_group[left_group[i]] = -1;
-  }
-  for(unsigned int i = 0; i < right_group.size(); i++){
-    right_axis_sort_ids[axis][i] = right_group[i];
-    next_group[right_group[i]] = 1;
-  }
-  for(int i = 0; i < group_size; i++){
-    for(int j = 0; j < 3; j++){
-      if(j==axis) continue;
-      if(next_group[axis_sort_ids[j][i]] == -1){
-        left_axis_sort_ids[j][left_axis_count[j]] = axis_sort_ids[j][i];
-        left_axis_count[j]++;
-      }
-      else if(next_group[axis_sort_ids[j][i]] == 1){
-        right_axis_sort_ids[j][right_axis_count[j]] = axis_sort_ids[j][i];
-        right_axis_count[j]++;
-      }
-    }
-  }
-
-  bool left = false;
-  bool right = false;
-  if(left_group.size() > 0){
-    left = CreateNode
-      (root_id,
-       point_size,
-       nodes,
-       left_axis_sort_ids,
-       depth+1,
-       median_id,
-       false);
-  }else
-    left = true;
-
-  if(right_group.size() > 0){
-    right = CreateNode
-      (root_id,
-       point_size,
-       nodes,
-       right_axis_sort_ids,
-       depth+1,
-       median_id,
-       true);
-  }else
-    right = true;
-
-  if(right && left)
-    return 1;
-
-  return 0;
-}
-
-double EuclidDist3D(const float* a, const float* b){
+double EuclidDist3D(const Vector3d &a, const float* b){
   float d2 = 0;
   for(int i = 0; i < 3; ++i){
     d2 += pow(a[i] - b[i], 2);
   }
   return sqrt(d2);
 }
+
+
+class KDTree{
+  const unsigned int DIM = 3;
+
+public:
+  void build(vector<Leaf> &leaves){
+    root_ = buildTreeRecursive(leaves.begin(),
+                               leaves.size(),
+                               0);
+  }
+
+  vector<int> rangeSearch(const float* query_position,
+                   const vector<Leaf> &leaves,
+                   const double &search_range){
+    neighbor_list_.clear();
+
+    rangeSearchRecursive(query_position,
+                         leaves,
+                         root_,
+                         search_range);
+
+    return neighbor_list_;
+  }
+
+private:
+  NodePtr buildTreeRecursive(vector<Leaf>::iterator itr,
+                             int point_count,
+                             const int &depth)
+  {
+    if(point_count <= 0)
+      return nullptr;
+
+    const uint axis = depth % DIM;
+    const int mid = point_count / 2;
+
+    std::nth_element(itr,
+                     itr + mid,
+                     itr + point_count,
+                     [&](Leaf &l,
+                         Leaf &r)
+                     {
+                       return l.mean[axis] < r.mean[axis];
+                     });
+
+    NodePtr node = NodePtr(new Node());
+    node->idx = mid;
+    node->axis = axis;
+
+    node->leftChild = buildTreeRecursive(itr, mid, depth + 1);
+    node->rightChild = buildTreeRecursive
+      (itr + mid + 1,
+       point_count - mid,
+       depth + 1);
+
+    return node;
+  }
+
+  void rangeSearchRecursive(const float* query_position,
+                            const vector<Leaf> &leaves,
+                            const NodePtr &node_ptr,
+                            const double &search_range){
+    // reach leave.
+    if(node_ptr == nullptr){
+      return;
+    }
+
+    Leaf l = leaves.at(node_ptr->idx);
+
+    double dist = EuclidDist3D(l.mean, query_position);
+
+    if(dist < search_range){
+      neighbor_list_.push_back(node_ptr->idx);
+    }
+
+    NodePtr next;
+    NodePtr opp;
+
+    bool need_search_opposit;
+
+    if(query_position[node_ptr->axis] < l.mean[node_ptr->axis]){
+      next = node_ptr->leftChild;
+      opp = node_ptr->rightChild;
+
+      need_search_opposit = l.mean[node_ptr->axis] < query_position[node_ptr->axis] + search_range;
+    }else{
+      next = node_ptr->rightChild;
+      opp = node_ptr->leftChild;
+
+      need_search_opposit = l.mean[node_ptr->axis] > query_position[node_ptr->axis] - search_range;
+    }
+
+    rangeSearchRecursive(query_position, leaves, next, search_range);
+
+    if(need_search_opposit)
+        rangeSearchRecursive(query_position, leaves, opp, search_range);
+  }
+
+  NodePtr root_;
+  vector<int> neighbor_list_;
+};
 
 
 MatrixXd TransformPointCloud (const MatrixXd &cloud,
@@ -442,19 +435,135 @@ void pointDerivatives(PointT & point,
 
 class NDTCalc{
 public:
-  double transformation_epsilon = 0.01;
+  static constexpr double transformation_epsilon = 0.01;
   double leaf_size = 0.08;
+  double inverse_leaf_size_ = 1. / leaf_size;
   // double output_prob = 0.055;
   double output_prob = 0.0001;
   int neighbor_id;
   int root_id = -1;
 
-  void CreateMap(const MatrixXd &cloud){
-    // reset k-d tree.
-    leaves.clear();
-    nodes_map.clear();
+  NDTCalc(){
+  }
 
-    // NDT Map Generate
+
+  array<int, 3> realToIndex(const array<double, 3> &point) const{
+
+    array<int, 3> index;
+
+    for(unsigned int i = 0; i < 3; ++i){
+      index[i] = static_cast<int>
+        (floor
+         (point[i] * inverse_leaf_size_) - min_b[i]);
+    }
+
+    return index;
+  }
+
+  int calcMapId(const array<int, 3> &index) const{
+    int map_id = 0;
+    for(unsigned int j = 0; j < 3; ++j)
+      map_id += axis_v_index[j] * div_mul[j];
+    return map_id;
+  }
+
+  vector<Leaf> calcMean(vector<Leaf> &leaves){
+    transform(
+              leaves.begin(),
+              leaves.end(),
+              leaves.begin(),
+              [](Leaf leaf){
+                Leaf after(leaf);
+
+                for(auto itr_p = leaf.points.begin();
+                    itr_p != leaf.points.end();
+                    ++itr_p){
+                  after.mean += *itr_p;
+                }
+
+                after.mean /= leaf.points.size();
+
+                return after;
+              });
+
+    return leaves;
+  }
+
+
+  vector<Leaf> calcCovariance(vector<Leaf> &leaves)
+  {
+    transform(
+              leaves.begin(), leaves.end(),
+              leaves.begin(),
+              [](Leaf leaf){
+                Leaf after(leaf);
+
+                for(auto itr_p = leaf.points.begin();
+                    itr_p != leaf.points.end(); ++itr_p){
+
+                  Vector3d &p_ref = *itr_p;
+
+                  for(unsigned int j = 0; j < 3; ++j){
+                    after.params[j] +=\
+                      pow(p_ref[j] - leaf.mean[j], 2);
+                  }
+
+                  after.params[3] +=
+                    (p_ref[0] - leaf.mean[0]) *
+                    (p_ref[1] - leaf.mean[1]);
+
+                  after.params[4] +=
+                    (p_ref[0] - leaf.mean[0]) *
+                    (p_ref[2] - leaf.mean[2]);
+
+                  after.params[5] +=
+                    (p_ref[1] - leaf.mean[1]) *
+                    (p_ref[2] - leaf.mean[2]);
+                }
+
+                for(unsigned int j = 0; j < 6; ++j){
+                  after.params[j] /= leaf.points.size();
+                }
+
+                return after;
+              });
+
+    return leaves;
+  }
+
+
+  vector<Leaf> calcInvertMatrix(vector<Leaf> &leaves){
+    // 3点以上なら平均計算それ以下なら削除
+    for(auto iter = leaves.begin(); iter != leaves.end(); ++iter){
+      //cov作る
+      CovarianceMatrixT cov;
+      cov <<
+        iter->params[0],
+        iter->params[3],
+        iter->params[4],
+        iter->params[3],
+        iter->params[1],
+        iter->params[5],
+        iter->params[4],
+        iter->params[5],
+        iter->params[2];
+
+      //check付きinverse計算
+      bool exists;
+      double det = 0;
+      cov.computeInverseAndDetWithCheck
+        (iter->inverse_params,
+         det, exists);
+
+      if(!exists)
+        leaves.erase(iter);
+    }
+
+    return leaves;
+  }
+
+
+  map<int, Leaf> createLeaves(const MatrixXd &cloud){
     // search min max point
     float min_p[3] = {numeric_limits<float>::max(),
                       numeric_limits<float>::max(),
@@ -472,280 +581,110 @@ public:
     }
 
     // calculation min max div voxel
-    float inverse_leaf_size = 1 / leaf_size;
-    float min_b[3];
-    float max_b[3];
-    float div_b[3];
     for(int i=0;i<3;i++){
-      min_b[i] = static_cast<int>(floor(min_p[i] * inverse_leaf_size));
-      max_b[i] = static_cast<int>(floor(max_p[i] * inverse_leaf_size));
+      min_b[i] = static_cast<int>(floor(min_p[i] * inverse_leaf_size_));
+      max_b[i] = static_cast<int>(floor(max_p[i] * inverse_leaf_size_));
       div_b[i] = max_b[i] - min_b[i] + 1;
     }
 
-    float div_mul[3];
     div_mul[0] = 1;
     div_mul[1] = div_b[0];
     div_mul[2] = div_b[0] * div_b[1];
 
-    for(unsigned int i = 0; i < cloud.rows(); ++i){
+    map<int, Leaf> leaves;
 
+    for(unsigned int i = 0; i < cloud.rows(); ++i){
       // grid quantization
-      int axis_v_index[3];
-      for(unsigned int j = 0; j < 3; ++j){
-        axis_v_index[j] = static_cast<int>
-          (floor
-           (cloud(i, j) * inverse_leaf_size) -
-           static_cast<float>(min_b[j])
-           );
-      }
 
       // calc grid id
-      int map_id = 0;
-      for(unsigned int j = 0; j < 3; ++j)
-        map_id += axis_v_index[j] * div_mul[j];
+      int map_id = calcMapId(realToIndex({cloud(i, 0),
+                                          cloud(i, 1),
+                                          cloud(i, 2)}));
 
-      leaves[map_id].points++;
-
-      for(unsigned int j = 0; j < 3; ++j)
-        leaves[map_id].mean[j] += cloud(i, j);
+      leaves[map_id].points.push_back(cloud.row(i));
     }
 
-    vector<int> erase_list;
-    for(auto iter = leaves.begin(); iter != leaves.end(); ++iter){
-      //3点以上なら平均計算それ以下なら削除
-      if(iter->second.points < 5){
-        erase_list.push_back(iter->first);
-        continue;
-      }
+    return leaves;
+  }
 
-      for(unsigned int j = 0; j < 3; ++j){
-          iter->second.mean[j] /= iter->second.points;
-      }
+  void erase_if(vector<Leaf> &items,
+                function<bool(const Leaf&)> cond) {
+    for( auto it = items.begin(); it != items.end(); ) {
+      if(cond(*it))
+        it = items.erase(it);
+      else
+        ++it;
+    }
+  }
+
+  void CreateMap(const MatrixXd &cloud){
+    // NDT Map Generate
+    map<int, Leaf> leaves = createLeaves(cloud);
+
+    vector<Leaf> leaves_vec;
+
+    for(auto itr = leaves.begin(); itr != leaves.end(); ++itr){
+      leaves_vec.push_back(itr->second);
     }
 
-    // erase grid that less than 5 points.
-    for(unsigned int erase_id = 0; erase_id < erase_list.size(); ++erase_id){
-      auto erase_iter = leaves.find(erase_list[erase_id]);
-      if( erase_iter != leaves.end()) leaves.erase(erase_iter);
-    }
+    // filter leaf less than 5 points.
+    erase_if(leaves_vec,
+             [](const Leaf &leaf){
+               return leaf.points.size() < 5;});
 
-    // cerr << leaves.size() << endl;
+    // calc mean
+    leaves_vec = calcMean(leaves_vec);
 
     // calc covariance
-    for(unsigned int i = 0; i < cloud.rows(); ++i){
-      int axis_v_index[3];
-      for(unsigned int j = 0; j < 3; ++j)
-        axis_v_index[j] = static_cast<int>
-          (floor(cloud(i, j) * inverse_leaf_size) -
-           static_cast<float>(min_b[j]));
-
-      int map_id = 0;
-      for(unsigned int j = 0; j < 3; ++j)
-        map_id += axis_v_index[j] * div_mul[j];
-
-      auto process_iter = leaves.find(map_id);
-      if (process_iter != leaves.end()){
-
-        for(unsigned int j = 0; j < 3; ++j){
-
-          if(isinf(cloud(i, j) - leaves[map_id].mean[j])){
-            return;
-          }
-
-          leaves[map_id].params[j] += pow(cloud(i, j) - leaves[map_id].mean[j], 2);
-        }
-
-        leaves[map_id].params[3] +=
-          (cloud(i, 0) - leaves[map_id].mean[0]) *
-          (cloud(i, 1) - leaves[map_id].mean[1]);
-
-        leaves[map_id].params[4] +=
-          (cloud(i, 0) - leaves[map_id].mean[0]) *
-          (cloud(i, 2) - leaves[map_id].mean[2]);
-
-        leaves[map_id].params[5] +=
-          (cloud(i, 1) - leaves[map_id].mean[1]) *
-          (cloud(i, 2) - leaves[map_id].mean[2]);
-
-      }
-    }
+    leaves_vec = calcCovariance(leaves_vec);
 
     // 逆行列計算
-    erase_list.clear();
-    // 3点以上なら平均計算それ以下なら削除
-    for(auto iter = leaves.begin(); iter != leaves.end(); ++iter){
-
-      for(unsigned int j = 0; j < 6; ++j){
-        iter->second.params[j] /= iter->second.points;
-      }
-
-      //cov作る
-      CovarianceMatrixT cov;
-      cov <<
-        iter->second.params[0],
-        iter->second.params[3],
-        iter->second.params[4],
-        iter->second.params[3],
-        iter->second.params[1],
-        iter->second.params[5],
-        iter->second.params[4],
-        iter->second.params[5],
-        iter->second.params[2];
-
-      //check付きinverse計算
-      CovarianceMatrixT cov_inv;
-      bool exists;
-      double det = 0;
-      cov.computeInverseAndDetWithCheck(cov_inv,det,exists);
-
-      if(exists){//inverseがある場合→inverse_params[6]={0,0,0,0,0,0};11,22,33,12,13,23登録
-        iter->second.inverse_params[0] = cov_inv(0,0);
-        iter->second.inverse_params[1] = cov_inv(1,1);
-        iter->second.inverse_params[2] = cov_inv(2,2);
-        iter->second.inverse_params[3] = cov_inv(0,1);
-        iter->second.inverse_params[4] = cov_inv(0,2);
-        iter->second.inverse_params[5] = cov_inv(1,2);
-      }
-      else{
-        erase_list.push_back(iter->first);
-        // cerr << "erase" << iter->first << endl;
-      }
-    }
-
-    for(unsigned int erase_id=0;erase_id<erase_list.size();erase_id++){//点削除
-      auto erase_iter = leaves.find(erase_list[erase_id]);
-      if( erase_iter != leaves.end()) leaves.erase(erase_iter);
-    }
-
-    int max_points=0;
-    for(auto iter = leaves.begin(); iter != leaves.end(); ++iter){
-      if(max_points < iter->second.points){
-        max_points = iter->second.points;
-      }
-    }
+    leaves_vec = calcInvertMatrix(leaves_vec);
 
     //木を作る
-    root_id=-1;
-    nodes.resize(leaves.size());
-    vector<vector<int>> axis_sort_ids(3,vector<int>(leaves.size()));
-    vector<point_with_id> point_with_ids(leaves.size());
-    int point_count = 0;
-    vector<int> index_map;
-    index_map.resize(leaves.size());
-    for(auto iter = leaves.begin(); iter != leaves.end(); ++iter){//voxel
-      index_map[point_count] = iter->first;
-      point_with_ids[point_count].id = point_count;
-      // point_with_ids[point_count].id = iter->first;
-      point_with_ids[point_count].pos[0] = iter->second.mean[0];//mean
-      point_with_ids[point_count].pos[1] = iter->second.mean[1];
-      point_with_ids[point_count].pos[2] = iter->second.mean[2];
-      point_count++;
-    }
+    kdtree_.build(leaves_vec);
 
-    for(unsigned int sort_axis=0; sort_axis<3; sort_axis++){
-      sort(point_with_ids.begin(), point_with_ids.end(),
-           [&](const point_with_id &n1, const point_with_id &n2)
-           {return AxisSort(sort_axis, n1, n2);});
-      for (unsigned int i=0 ; i < leaves.size() ; i++){
-        axis_sort_ids[sort_axis][i]=point_with_ids[i].id;
-      }
-    }
-
-    CreateNode
-      (&root_id,
-       leaves.size(),
-       nodes,
-       axis_sort_ids,
-       0, // initial depth
-       -1, // root id
-       false);
-
-    int root_map_id;
-    root_map_id = index_map[root_id];
-    root_id = root_map_id;
-
-    for(unsigned int idx = 0; idx < leaves.size(); idx++){//voxel
-      if(0 <= nodes[idx].parent_id){
-        nodes_map[index_map[idx]].parent_id = index_map[nodes[idx].parent_id];
-      }else{
-        nodes_map[index_map[idx]].parent_id = -1;
-      }
-
-      if(0 <= nodes[idx].left_id)
-        nodes_map[index_map[idx]].left_id = index_map[nodes[idx].left_id];
-      else
-        nodes_map[index_map[idx]].left_id = -1;
-
-      if(0 <= nodes[idx].right_id)
-        nodes_map[index_map[idx]].right_id = index_map[nodes[idx].right_id];
-      else
-        nodes_map[index_map[idx]].right_id = -1;
-
-      nodes_map[index_map[idx]].axis = nodes[idx].axis;
-    }
-
-    // cerr << "index" << ","
-    //      << "parent_id" << ","
-    //      << "left_id" << ","
-    //      << "right_id" << ","
-    //      << "axis" << ","
-    //      << "mean_x" << ","
-    //      << "mean_y" << ","
-    //      << "mean_z" << endl;
-    // for(auto n = nodes_map.begin(); n != nodes_map.end(); ++n){
-    //   cerr << n->first << ",";
-    //   cerr << n->second.parent_id << ",";
-    //   cerr << n->second.left_id << ",";
-    //   cerr << n->second.right_id << ",";
-    //   cerr << n->second.axis << ",";
-    //   cerr << leaves[n->first].mean[0] << ","
-    //        << leaves[n->first].mean[1] << ","
-    //        << leaves[n->first].mean[2] << ","
-    //        << endl;
-    // }
-
-    // cerr << "root_id:" << root_id << endl;
+    leaves_ = leaves_vec;
   }
 
   void searchRecursive(const float* query_position,
-                       const map <int, Leaf> &leaves,
-                       const map <int, node> &tree,
-                       const int &node_id,
+                       const vector<Leaf> &leaves,
+                       const NodePtr &node_ptr,
                        double &min_dist){
     // reach leave.
-    if(node_id < 0){
+    if(node_ptr == nullptr ){
       return;
     }
-    // cout << " node_id = " << node_id;
-    auto tree_iter = tree.find(node_id);
-    auto leaf_iter = leaves.find(node_id);
 
-    node n = tree_iter->second;
-    Leaf l = leaf_iter->second;
-    // cout << "dist" << endl;
-    double dist = EuclidDist3D(l.mean, query_position);
+    // cout << " node_id = " << node_id;
+    Leaf l = leaves[node_ptr->idx];
+    double dist = EuclidDist3D(l.mean,
+                               query_position);
 
     if(dist < min_dist){
       min_dist = dist;
-      neighbor_id = node_id;
+      neighbor_id = node_ptr->idx;
     }
 
-    int next_id;
-    int opp_id;
+    NodePtr next;
+    NodePtr opp;
     // cout << "left&right" << endl;
-    if(query_position[n.axis] < l.mean[n.axis]){
-      next_id = n.left_id;///ここ見る
-      opp_id = n.right_id;
+    if(query_position[node_ptr->axis] <
+       l.mean[node_ptr->axis]){
+      next = node_ptr->leftChild;
+      opp = node_ptr->rightChild;
     }else{
-      next_id = n.right_id;///ここ見る
-      opp_id = n.left_id;
+      next = node_ptr->rightChild;
+      opp = node_ptr->leftChild;
     }
 
-    searchRecursive(query_position, leaves, tree, next_id, min_dist);
+    searchRecursive(query_position, leaves, next, min_dist);
 
-    double diff = fabs(query_position[n.axis] - l.mean[n.axis]);
+    double diff = fabs(query_position[node_ptr->axis]
+                       - l.mean[node_ptr->axis]);
     if (diff < min_dist)
-      searchRecursive(query_position, leaves, tree, opp_id, min_dist);
+      searchRecursive(query_position,
+                      leaves, opp, min_dist);
   }
 
   TransformT Align(TransformT init_trans,
@@ -788,12 +727,12 @@ public:
            point_hessian);
 
         //近傍探索
-        neighbor_list.clear();
+        // neighbor_list.clear();
         float target[3];
         for(int i = 0; i < 3; ++i)
           target[i] = tf_cloud(point_id, i);
 
-        rangeSearchRecursive(target, leaves, nodes_map, root_id, leaf_size);
+        vector<int> neighbor_list = kdtree_.rangeSearch(target, leaves_, leaf_size);
         // double temp = numeric_limits<double>::max();
         // searchRecursive(target, leaves, nodes_map, root_id, temp);
 
@@ -808,11 +747,11 @@ public:
         neighbor_found_points_.push_back(point);
 
         //近傍ループ
-        for (unsigned int neighbor_id = 0;neighbor_id < neighbor_list.size();neighbor_id++){
-          // auto neighbor_iter = leaves.find(neighbor_list[neighbor_id]);
-          // auto neighbor_iter = leaves[neighbor_id];
+        for (auto neighbor_itr = neighbor_list.begin() ;
+             neighbor_itr != neighbor_list.end();
+             ++neighbor_itr){
 
-          Leaf l = leaves.at(neighbor_list[neighbor_id]);
+          Leaf l = leaves_.at(*neighbor_itr);
 
           //分布の型変換
           PointT mean;
@@ -888,49 +827,6 @@ public:
     return tf;
   }
 
-  void rangeSearchRecursive(const float* query_position,
-                            const map <int, Leaf> &leaves,
-                            const map <int, node> &tree,
-                            const int &node_id,
-                            const double &search_range){
-    // reach leave.
-    if(node_id < 0){
-      return;
-    }
-
-    node n = tree.at(node_id);
-    Leaf l = leaves.at(node_id);
-
-    double dist = EuclidDist3D(l.mean, query_position);
-
-    if(dist < search_range){
-      neighbor_list.push_back(node_id);
-    }
-
-    int next_id;
-    int opp_id;
-
-    bool need_search_opposit;
-
-    if(query_position[n.axis] < l.mean[n.axis]){
-      next_id = n.left_id;
-      opp_id = n.right_id;
-
-      need_search_opposit = l.mean[n.axis] < query_position[n.axis] + search_range;
-    }else{
-      next_id = n.right_id;
-      opp_id = n.left_id;
-
-      need_search_opposit = l.mean[n.axis] > query_position[n.axis] - search_range;
-    }
-
-    rangeSearchRecursive(query_position, leaves, tree, next_id, search_range);
-
-    if(need_search_opposit)
-        rangeSearchRecursive(query_position, leaves, tree, opp_id, search_range);
-  }
-
-
 #ifdef DEBUG
   vector<JacobianT> jacobian_vector;
   vector<JacobianT> jacobian_vector_sum;
@@ -943,10 +839,15 @@ public:
   vector<PointT> neighbor_not_found_points_;
 #endif // DEBUG
 
-  vector<int> neighbor_list;
-  map<int, node> nodes_map;
-  map<int, Leaf> leaves;
-  vector<node> nodes;
+  vector<Leaf> leaves_;
+
+  int axis_v_index[3];
+  float div_mul[3];
+  float min_b[3];
+  float max_b[3];
+  float div_b[3];
+
+  KDTree kdtree_;
 };
 
 #endif // __NDT_SCAN_MATCHER_HPP__

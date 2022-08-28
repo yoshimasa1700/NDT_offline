@@ -3,3 +3,4 @@ build/
 compile_commands.json
 data/
 __pycache__/
+.cache/

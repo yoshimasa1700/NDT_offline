@@ -181,14 +181,14 @@ public:
     for(int i = 0; i < 3; ++i)
       target[i] = p::extract<double>(query[i]);
 
-    calc.rangeSearchRecursive(target, calc.leaves,
-                              calc.nodes_map,
-                              calc.root_id,
-                              calc.leaf_size);
+    vector<int> neighbor_list =
+      calc.kdtree_.rangeSearch(target,
+                               calc.leaves_,
+                               calc.leaf_size);
 
-    for(unsigned int i = 0; i < calc.neighbor_list.size(); ++i){
-      int neighbor_id = calc.neighbor_list[i];
-      Leaf l = calc.leaves.at(neighbor_id);
+    for(unsigned int i = 0; i < neighbor_list.size(); ++i){
+      int neighbor_id = neighbor_list[i];
+      Leaf l = calc.leaves_.at(neighbor_id);
 
       p::list point;
       for(int j = 0; j < 3; ++j)
@@ -204,15 +204,15 @@ public:
   p::list get_map(){
     p::list result;
 
-    for(auto itr = calc.leaves.begin(); itr != calc.leaves.end(); ++itr){
+    for(auto itr = calc.leaves_.begin(); itr != calc.leaves_.end(); ++itr){
 
       p::list mean;
       for(int i = 0; i < 3; ++i)
-        mean.append(itr->second.mean[i]);
+        mean.append(itr->mean[i]);
 
       p::list cov;
       for(int i = 0; i < 6; ++i)
-        cov.append(itr->second.params[i]);
+        cov.append(itr->params[i]);
 
       result.append(p::make_tuple(mean ,cov));
     }
