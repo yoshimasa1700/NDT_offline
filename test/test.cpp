@@ -11,6 +11,21 @@ using RndDist = std::uniform_real_distribution<float>;
 using PointArrT = std::array<float, 3>;
 
 
+void visualizeArr(const PointArrT &point){
+
+  for(int i = 0; i < 3; ++i)
+    cerr << point[i] << " ";
+  cerr << endl;
+}
+
+
+void visualizeArr(const Vector3d &point){
+  for(int i = 0; i < 3; ++i)
+    cerr << point[i] << " ";
+  cerr << endl;
+}
+
+
 // TEST(TestAxisSort, Simple1) {
 
 //   point_with_id a, b;
@@ -112,85 +127,49 @@ TEST(TestCreateNode, Simple1) {
   // sample input.
 
   // create sample leaves
-  unsigned int gen_point_count = 1000;
+  unsigned int gen_point_count = 10;
   vector<Leaf> leaves = createRandomPoints(gen_point_count);
 
   for(uint i = 0; i < leaves.size(); ++i){
     visualizeLeaf(leaves[i]);
   }
 
-  // run
-  // CreateNode
-  //   (&root_id,
-  //    leaves.size(),
-  //    nodes,
-  //    axis_sort_ids,
-  //    depth,
-  //    parent_id,
-  //    node_is_right);
+  // build tree
+  KDTree kd_tree_;
 
-  // EXPECT_EQ(nodes[1].parent_id, -1);
-  // EXPECT_EQ(nodes[1].left_id, 0);
-  // EXPECT_EQ(nodes[1].right_id, 2);
+  cerr << "build kd tree" << endl;
+  kd_tree_.build(leaves);
 
   // range search check
 
-  // vector<int> gt_neighbor_list;
+  // create ground truth in brute force.
+  vector<int> gt_neighbor_list;
 
-  // // gen query position
-  // PointArrT query = GenerateRandomPoint(eng);
+  // gen query position
+  std::random_device rd;
+  RndEng eng(rd());
+  PointArrT query = GenerateRandomPoint(eng);
 
-  // // def range
-  // double search_range = 5.0;
+  // def range
+  double search_range = 5.0;
 
-  // // get ground truth
-  // for(unsigned int i = 0; i < points.size(); ++i){
+  // get ground truth by brute force.
+  for(unsigned int i = 0; i < leaves.size(); ++i){
+    if(EuclidDist3D(leaves[i].mean , query.data()) < search_range){
+      gt_neighbor_list.push_back(i);
+    }
+  }
 
-  //   if(EuclidDist3D(points[i].data(), query.data()) < search_range){
-  //     gt_neighbor_list.push_back(i);
-  //   }
-  // }
-
-  // root_id = index_map[root_id];
-
-  // map<int, node> nodes_map;
-
-  // for(unsigned int idx = 0; idx < leaves.size(); idx++){//voxel
-  //   if(0 <= nodes[idx].parent_id){
-  //     nodes_map[index_map[idx]].parent_id = index_map[nodes[idx].parent_id];
-  //   }else{
-  //     nodes_map[index_map[idx]].parent_id = -1;
-  //   }
-
-  //   if(0 <= nodes[idx].left_id)
-  //     nodes_map[index_map[idx]].left_id = index_map[nodes[idx].left_id];
-  //   else
-  //     nodes_map[index_map[idx]].left_id = -1;
-
-  //   if(0 <= nodes[idx].right_id)
-  //     nodes_map[index_map[idx]].right_id = index_map[nodes[idx].right_id];
-  //   else
-  //     nodes_map[index_map[idx]].right_id = -1;
-
-  //   nodes_map[index_map[idx]].axis = nodes[idx].axis;
-  // }
-
-  // // range search
   // NDTCalc ndt_calc;
+  vector<int> neighbor_list = kd_tree_.rangeSearch(query.data(), leaves, search_range);
 
-  // cerr << "root: " << root_id << endl;
+  // compare ground truth and neighbor_list
+  visualizeArr(query);
 
-  // ndt_calc.rangeSearchRecursive(query.data(), leaves, nodes_map, root_id, search_range);
+  cerr << "gt neighbors" << endl;
+  for(unsigned int i = 0 ; i < gt_neighbor_list.size(); ++i){
+    visualizeArr(leaves[gt_neighbor_list[i]].mean);
+  }
 
-  // // compare ground truth and neighbor_list
-
-  // cerr << "query: " << endl;
-  // visualizeArr(query);
-
-  // cerr << "gt neighbors" << endl;
-  // for(unsigned int i = 0 ; i < gt_neighbor_list.size(); ++i){
-  //   visualizeArr(points[gt_neighbor_list[i]]);
-  // }
-
-  // ASSERT_EQ(ndt_calc.neighbor_list.size(), gt_neighbor_list.size());
+  ASSERT_EQ(neighbor_list.size(), gt_neighbor_list.size());
 }
